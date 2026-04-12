@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String            @id @default(cuid())
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  name                 String
+  email                String            @unique
+  password             String
+  phone                String?
+  city                 String?
+  state                String?
+  zipCode              String?
+  raioKm               Int               @default(120)
+  consumoKmL           Float             @default(12)
+  avatarUrl            String?
+  plano                Plano             @default(BASICO)
+  assinaturaStatus     AssinaturaStatus  @default(TRIAL)
+  trialEndsAt          DateTime?
+  assinaturaEndsAt     DateTime?
+  asaasCustomerId      String?
+  asaasSubscriptionId  String?
+  creditosLaudo        Int               @default(3)
+  telegramChatId       String?
+  telegramEnabled      Boolean           @default(false)
+  whatsappEnabled      Boolean           @default(false)
+  emailAlertas         Boolean           @default(true)
+  silencioNoturno      Boolean           @default(true)
+  margemMinima         Int               @default(1500)
+  focoTipo             String            @default("TODOS")
+  listings             Listing[]
+  alerts               Alert[]
+  radarConfig          RadarConfig?
+  laudos               Laudo[]
+  crmItems             CrmItem[]
+  sessions             Session[]
+  pagamentos           Pagamento[]
+  auditLogs            AuditLog[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+}
+
+model Listing {
+  id                 String        @id @default(cuid())
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  userId             String
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  price              Float
+  type               VehicleType
+  source             String
+  sourceUrl          String?
+  imageUrls          String[]
+  brand              String?
+  model              String?
+  year               Int?
+  mileage            Int?
+  color              String?
+  plate              String?
+  city               String?
+  state              String?
+  distanceKm         Float?
+  opportunityScore   Int?
+  riskScore          Int?
+  riskLevel          RiskLevel?
+  aiSummary          String?
+  positiveSignals    String[]
+  alertSignals       String[]
+  fipePrice          Float?
+  avgMarketPrice     Float?
+  estimatedMargin    Float?
+  status             ListingStatus @default(PENDING)
+  alertSent          Boolean       @default(false)
+  isFavorite         Boolean       @default(false)
+  isDiscarded        Boolean       @default(false)
+  alerts             Alert[]
+  crmItem            CrmItem?
+}
+
+model RadarConfig {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime @updatedAt
+  ativo          Boolean  @default(true)
+  modelos        String[] @default(["XRE 300", "CB 500", "Fazer 250"])
+  fontes         String[] @default(["olx", "facebook", "webmotors"])
+  seedUrls       String[] @default([])
+  tipo           String   @default("TODOS")
+  precoMax       Float    @default(35000)
+  kmMax          Int      @default(80000)
+  distanciaMax   Int      @default(120)
+  scoreMin       Int      @default(70)
+  riscoMax       String   @default("MEDIO")
+  anoMin         Int      @default(2018)
+  margemMin      Float    @default(1500)
+  frequenciaMin  Int      @default(60)
+  scoreAlerta    Int      @default(75)
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId   String?
+  listing     Listing?  @relation(fields: [listingId], references: [id])
+  channel     String
+  message     String
+  sent        Boolean   @default(false)
+  sentAt      DateTime?
+  errorMsg    String?
+}
+
+model CrmItem {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId    String?   @unique
+  listing      Listing?  @relation(fields: [listingId], references: [id])
+  title        String
+  precoCompra  Float?
+  precoVenda   Float?
+  status       CrmStatus @default(INTERESSE)
+  notes        String?
+  plate        String?
+  year         Int?
+  mileage      Int?
+  photos       String[]
+}
+
+model Laudo {
+  id                 String   @id @default(cuid())
+  createdAt          DateTime @default(now())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placa              String
+  renavam            String?
+  resultado          Json
+  scoreCompra        Int?
+  situacao           String?
+  pdfUrl             String?
+  custoCreditoUsado  Int      @default(1)
+  valorCobrado       Float    @default(19)
+}
+
+model Pagamento {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  valor           Float
+  descricao       String
+  status          String
+  asaasId         String?  @unique
+  asaasPaymentId  String?
+  tipo            String
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ip        String
+  email     String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+  @@index([email, createdAt])
+}
+
+model RateLimitEntry {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model SecurityLog {
+  id        String   @id @default(cuid())
+  event     String
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+}
+
+enum VehicleType {
+  MOTO
+  CARRO
+  CAMINHAO
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ListingStatus {
+  PENDING
+  ANALYZED
+  ALERTED
+  DISCARDED
+}
+
+enum Plano {
+  BASICO
+  PRO
+  AGENCIA
+}
+
+enum AssinaturaStatus {
+  TRIAL
+  ATIVA
+  CANCELADA
+  SUSPENSA
+  ENCERRADA
+}
+
+enum CrmStatus {
+  INTERESSE
+  NEGOCIANDO
+  COMPRADO
+  REVENDIDO
+}
