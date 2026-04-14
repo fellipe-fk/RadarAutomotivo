@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
     const readyListings = listings.filter((listing) => matchesRadar(listing, normalizedConfig))
     const sentAlerts = alerts.filter((alert) => alert.sent)
     const failedAlerts = alerts.filter((alert) => !alert.sent)
+    const lastScanAt = alerts[0]?.createdAt || null
 
     return NextResponse.json({
       config: normalizedConfig,

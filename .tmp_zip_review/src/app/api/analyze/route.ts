@@ -5,7 +5,6 @@ import { requireAuth } from '@/lib/auth'
 import { analysisRiskMap, parseEstimatedMarginValue, runAnalysisWithFallback } from '@/lib/listing-analysis'
 import { extractListingFromUrl, NotAVehicleError } from '@/lib/listing-extractor'
 import { prisma } from '@/lib/prisma'
-import { matchesRadar } from '@/lib/radar'
 import { sendTelegramAlert } from '@/lib/telegram'
 
 function parseNumberish(value: unknown) {
@@ -42,6 +41,7 @@ export async function POST(req: NextRequest) {
       try {
         extracted = await extractListingFromUrl(cleanSourceUrl)
       } catch (error) {
+        // Erro de conteúdo que não é veículo — retornar imediatamente, não fazer fallback manual
         if (error instanceof NotAVehicleError) {
           return NextResponse.json(
             {
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        // Para outros erros de extração: só lança se não tiver dados manuais
         if (!manualTitle && !manualDescription && !parseNumberish(price)) {
           throw error
         }
@@ -145,10 +146,10 @@ export async function POST(req: NextRequest) {
     const config = await prisma.radarConfig.findUnique({ where: { userId: user.id } })
     const shouldAlert =
       config &&
-      !updated.alertSent &&
-      matchesRadar(updated, config) &&
-      user.telegramEnabled &&
-      !!user.telegramChatId
+      analysis.score_oportunidade >= (config.scoreAlerta || 75) &&
+      ((config.riscoMax === 'HIGH' ||
+        (config.riscoMax === 'MEDIUM' && riskLevel !== 'HIGH') ||
+        (config.riscoMax === 'LOW' && riskLevel === 'LOW')) as boolean)
 
     if (shouldAlert) {
       const message = buildAlertMessage({
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
         sourceUrl: updated.sourceUrl || undefined,
       })
 
-      const sent = await sendTelegramAlert(message, user.telegramChatId!)
+      const sent = await sendTelegramAlert(message, user.telegramChatId || undefined)
 
       await prisma.alert.create({
         data: {

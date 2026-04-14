@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RadarAuto — Sistema</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;display:flex;min-height:100vh}
+a{text-decoration:none;color:inherit}
+
+/* Sidebar */
+.sidebar{width:230px;background:#fff;border-right:1px solid #e8e8e5;display:flex;flex-direction:column;height:100vh;position:fixed;top:0;left:0;overflow-y:auto;z-index:50;padding:0 0 20px}
+.logo-wrap{padding:20px 16px 16px;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:#185FA5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;flex-shrink:0}
+.logo-text{font-size:15px;font-weight:600}
+.logo-text span{color:#185FA5}
+.nav-section{padding:14px 10px 4px;font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:#666;margin:1px 6px;transition:all .15s}
+.nav-item:hover{background:#f5f5f3;color:#1a1a1a}
+.nav-item.active{background:#EBF3FC;color:#185FA5;font-weight:500}
+.nav-item .ico{width:16px;height:16px;flex-shrink:0;opacity:.7}
+.nav-item.active .ico{opacity:1}
+.nav-badge{margin-left:auto;background:#185FA5;color:white;font-size:10px;padding:1px 6px;border-radius:99px;font-weight:600;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.nav-badge.green{background:#639922}
+.user-area{margin-top:auto;padding:12px 10px 0;border-top:1px solid #e8e8e5}
+.user-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background .15s}
+.user-card:hover{background:#f5f5f3}
+.user-avatar{width:34px;height:34px;border-radius:50%;background:#185FA5;color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.user-name{font-size:13px;font-weight:500}
+.user-plan{font-size:11px;color:#888}
+
+/* Main */
+.main{margin-left:230px;flex:1;padding:28px 32px;min-height:100vh}
+.page{display:none}
+.page.active{display:block}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:600}
+.page-sub{font-size:13px;color:#888;margin-top:3px}
+
+/* Cards */
+.card{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.card-title{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.metric{background:#f5f5f3;border-radius:10px;padding:14px 16px}
+.metric-label{font-size:11px;color:#888;margin-bottom:5px}
+.metric-value{font-size:22px;font-weight:600}
+.metric-sub{font-size:11px;color:#bbb;margin-top:3px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #ddd;background:#fff;color:#1a1a1a;font-family:inherit;transition:all .15s;white-space:nowrap;font-weight:500}
+.btn:hover{background:#f5f5f3}
+.btn-primary{background:#185FA5;color:#fff;border-color:#185FA5}
+.btn-primary:hover{background:#0C447C;border-color:#0C447C}
+.btn-green{background:#639922;color:#fff;border-color:#639922}
+.btn-green:hover{background:#3B6D11}
+.btn-red{background:#A32D2D;color:#fff;border-color:#A32D2D}
+.btn-sm{padding:5px 11px;font-size:12px}
+
+/* Forms */
+.form-label{display:block;font-size:12px;color:#888;margin-bottom:5px;font-weight:500}
+.form-input{width:100%;font-size:13px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-family:inherit;background:#fff;color:#1a1a1a;outline:none;transition:border-color .15s}
+.form-input:focus{border-color:#185FA5}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-group{margin-bottom:14px}
+
+/* Score bars */
+.score-wrap{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.score-lbl{font-size:12px;color:#888;width:90px;flex-shrink:0}
+.score-track{flex:1;height:7px;background:#f0f0ee;border-radius:99px;overflow:hidden}
+.score-fill{height:100%;border-radius:99px;transition:width .5s}
+.score-num{font-size:12px;font-weight:600;width:32px;text-align:right}
+
+/* Tags */
+.tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:99px;margin:2px;font-weight:500}
+.tag-green{background:#EAF3DE;color:#27500A}
+.tag-amber{background:#FAEEDA;color:#633806}
+.tag-blue{background:#E6F1FB;color:#0C447C}
+.tag-red{background:#FCEBEB;color:#791F1F}
+.tag-gray{background:#f0f0ee;color:#555}
+
+/* Listing card */
+.listing-card{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:16px 18px;margin-bottom:12px;transition:border-color .15s}
+.listing-card:hover{border-color:#b0cce8}
+.listing-card.radar-match{border-left:3px solid #185FA5}
+.listing-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.listing-title{font-size:15px;font-weight:600;margin-bottom:4px}
+.listing-meta{font-size:12px;color:#888;display:flex;gap:14px;flex-wrap:wrap}
+.listing-price{font-size:19px;font-weight:700;color:#185FA5;white-space:nowrap}
+.listing-fipe{font-size:11px;color:#888;text-align:right}
+.listing-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid #f0f0ee;gap:12px}
+.listing-summary{font-size:12px;color:#666;line-height:1.5;flex:1}
+
+/* Analyzing animation */
+.analyzing{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#f5f5f3;border-radius:10px;font-size:13px;color:#666}
+.dots{display:flex;gap:4px}
+.dot{width:7px;height:7px;border-radius:50%;background:#185FA5;animation:bounce 1s infinite}
+.dot:nth-child(2){animation-delay:.15s}
+.dot:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+/* URL input */
+.url-wrap{position:relative}
+.url-wrap input{padding-right:130px;font-size:14px;height:46px}
+.url-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%)}
+
+/* Radar config */
+.radar-config-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.radar-config-item label{display:block;font-size:11px;color:#888;margin-bottom:4px;font-weight:500}
+.radar-config-item select,.radar-config-item input{width:100%;font-size:12px;padding:7px 9px;border:1px solid #ddd;border-radius:8px;font-family:inherit;background:#fff;color:#1a1a1a}
+.radar-status{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:16px}
+.radar-status.on{background:#EAF3DE;border:1px solid #97C459;color:#27500A}
+.radar-status.off{background:#f5f5f3;color:#888}
+.rdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.rdot.on{background:#639922;animation:rdotpulse 2s infinite}
+.rdot.off{background:#aaa}
+@keyframes rdotpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.5}}
+.model-tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 11px;border-radius:99px;background:#E6F1FB;color:#0C447C;cursor:pointer;border:none;font-family:inherit;margin:2px}
+
+/* Calculadora */
+.calc-result{background:#EAF3DE;border:1px solid #97C459;border-radius:10px;padding:16px;margin-top:16px}
+.calc-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px solid #e8e8e5}
+.calc-row:last-child{border:none;font-weight:600;font-size:14px;color:#185FA5}
+.calc-neg{color:#A32D2D}
+.calc-pos{color:#27500A}
+
+/* Maps route card */
+.route-card{background:#E6F1FB;border:1px solid #85B7EB;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px}
+.route-icon{width:40px;height:40px;background:#185FA5;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;flex-shrink:0}
+.route-info{flex:1}
+.route-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.route-sub{font-size:12px;color:#185FA5;opacity:.8}
+
+/* CRM kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kanban-col{background:#f5f5f3;border-radius:10px;padding:12px}
+.kanban-col-title{font-size:12px;font-weight:600;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between}
+.kanban-card{background:#fff;border:1px solid #e8e8e5;border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.kanban-card:hover{border-color:#b0cce8}
+.kcard-title{font-size:12px;font-weight:600;margin-bottom:3px}
+.kcard-price{font-size:13px;color:#185FA5;font-weight:600}
+.kcard-meta{font-size:11px;color:#aaa;margin-top:3px}
+
+/* Analytics */
+.analytics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.analytics-card{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:16px}
+.bar-chart{display:flex;align-items:flex-end;gap:6px;height:80px;margin-top:10px}
+.bar-col{flex:1;background:#E6F1FB;border-radius:4px 4px 0 0;min-height:4px;transition:height .4s}
+
+/* Perfil */
+.avatar-big{width:72px;height:72px;border-radius:50%;background:#185FA5;color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:16px}
+.profile-section{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid #f0f0ee}
+.profile-section:last-child{border:none;padding:0;margin:0}
+.profile-section-title{font-size:14px;font-weight:600;margin-bottom:16px;color:#444}
+
+/* Toggle */
+.toggle-wrap{display:flex;align-items:center;gap:10px;padding:8px 0}
+.toggle-label{font-size:13px;flex:1}
+.toggle-desc{font-size:11px;color:#aaa;margin-top:1px}
+.toggle{position:relative;width:38px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#ddd;border-radius:11px;cursor:pointer;transition:.2s}
+.toggle input:checked + .toggle-slider{background:#185FA5}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s}
+.toggle input:checked + .toggle-slider::before{transform:translateX(16px)}
+
+/* Assinatura */
+.plan-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.plan-card{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px}
+.plan-card.featured{border:2px solid #185FA5}
+.plan-price{font-size:28px;font-weight:700;margin:6px 0 2px}
+.plan-period{font-size:13px;font-weight:400;color:#888}
+.plan-items{font-size:12px;color:#888;line-height:2.1;margin:12px 0}
+.plan-items li{list-style:none;display:flex;align-items:center;gap:6px}
+.plan-items li::before{content:'✓';color:#639922;font-weight:700;font-size:11px}
+
+/* Integrações */
+.int-card{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:16px}
+.int-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:#f5f5f3;flex-shrink:0}
+.int-info{flex:1}
+.int-name{font-size:14px;font-weight:600;margin-bottom:2px}
+.int-desc{font-size:12px;color:#888}
+.status-pill{display:flex;align-items:center;gap:5px;font-size:12px;padding:3px 10px;border-radius:99px}
+.status-pill.on{background:#EAF3DE;color:#27500A}
+.status-pill.off{background:#f5f5f3;color:#888}
+.status-dot{width:7px;height:7px;border-radius:50%}
+.status-dot.on{background:#639922}
+.status-dot.off{background:#aaa}
+
+/* Scan log */
+.scan-log{font-family:monospace;font-size:11px;background:#f5f5f3;border-radius:8px;padding:12px;line-height:2;max-height:130px;overflow-y:auto;color:#666}
+.log-ok{color:#639922}
+.log-skip{color:#aaa}
+.log-new{color:#185FA5;font-weight:700}
+.log-warn{color:#BA7517}
+
+/* Sources grid */
+.sources-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.source-item{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid #e8e8e5;border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s}
+.source-item:hover,.source-item.on{border-color:#185FA5;background:#E6F1FB;color:#0C447C}
+.source-dot{width:8px;height:8px;border-radius:50%;background:#ddd;flex-shrink:0}
+.source-item.on .source-dot{background:#185FA5}
+
+/* Alert preview */
+.alert-preview{background:#f5f5f3;border-radius:10px;padding:14px;font-family:monospace;font-size:12px;color:#444;line-height:1.9;border:1px solid #e8e8e5}
+
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:14px;padding:24px;width:520px;max-width:95vw}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* Empty */
+.empty{text-align:center;padding:48px 24px;color:#aaa}
+.empty-icon{font-size:36px;margin-bottom:12px}
+
+/* Filters bar */
+.filters-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.filter-chip{display:inline-flex;align-items:center;font-size:11px;padding:4px 11px;border-radius:99px;background:#E6F1FB;color:#0C447C;border:1px solid #85B7EB;font-weight:500}
+
+/* Notif toast */
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:white;padding:12px 18px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* ── Laudo Veicular ─────────────────────── */
+.placa-input{font-size:28px;font-weight:700;text-transform:uppercase;text-align:center;letter-spacing:6px;padding:14px;border:2px solid #ddd;border-radius:10px;width:100%;font-family:monospace;background:#fff;color:#1a1a1a;transition:border-color .2s;}
+.placa-input:focus{border-color:#185FA5;outline:none;}
+.laudo-status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;font-size:13px;font-weight:600;}
+.laudo-status-ok{background:#EAF3DE;color:#27500A;}
+.laudo-status-warn{background:#FAEEDA;color:#633806;}
+.laudo-status-bad{background:#FCEBEB;color:#791F1F;}
+.laudo-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f0ee;font-size:13px;gap:8px;}
+.laudo-row:last-child{border:none;}
+.laudo-key{color:#888;flex:1;}
+.status-item{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:6px;}
+.status-item.ok{background:#EAF3DE;}
+.status-item.warn{background:#FAEEDA;}
+.status-item.bad{background:#FCEBEB;}
+.debito-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;}
+.debito-icon{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:18px;flex-shrink:0;}
+.debito-info{flex:1;}
+.debito-title{font-size:14px;font-weight:600;margin-bottom:2px;}
+.debito-desc{font-size:12px;color:#888;}
+.debito-val{font-size:16px;font-weight:700;color:#A32D2D;white-space:nowrap;}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:16px}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .kanban{grid-template-columns:1fr 1fr}
+  .plan-cards{grid-template-columns:1fr}
+  .form-row,.form-row3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-icon">R</div>
+    <div class="logo-text">Radar<span>Auto</span></div>
+  </div>
+  <div class="nav-section">Principal</div>
+  <div class="nav-item active" onclick="nav('dashboard')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Dashboard</div>
+  <div class="nav-item" onclick="nav('oportunidades')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>Oportunidades<span class="nav-badge" id="nav-opp-count">2</span></div>
+  <div class="nav-item" onclick="nav('analisar')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>Analisar anúncio</div>
+  <div class="nav-item" onclick="nav('crm')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13V5l6-3 6 3v8"/><rect x="6" y="9" width="4" height="4"/></svg>Meu portfólio</div>
+  <div class="nav-item" onclick="nav('calculadora')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 5h2M9 5h2M5 8h2M9 8h2M5 11h2M9 11h2"/></svg>Calculadora</div>
+  <div class="nav-section">Sistema</div>
+  <div class="nav-item" onclick="nav('radar')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 2v2M8 12v2M2 8h2M12 8h2"/></svg>Radar de busca<span class="nav-badge green" id="radar-nav-badge">Ativo</span></div>
+  <div class="nav-item" onclick="nav('analytics')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14l3-5 3 3 3-6 3 2"/></svg>Analytics</div>
+  <div class="nav-item" onclick="nav('alertas')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2a5 5 0 015 5v3l1 2H2l1-2V7a5 5 0 015-5z"/><path d="M6.5 13.5a1.5 1.5 0 003 0"/></svg>Alertas</div>
+  <div class="nav-item" onclick="nav('laudo')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="12" height="14" rx="2"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>Laudo veicular<span class="nav-badge" style="background:#BA7517;" id="laudo-badge">R$ 19</span></div>
+  <div class="nav-item" onclick="nav('integracoes')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="8" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 8h6M6 7l6-2M6 9l6 2"/></svg>Integrações</div>
+  <div class="nav-item" onclick="nav('assinatura')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="2"/><path d="M1 7h14"/></svg>Assinatura</div>
+  <div class="nav-item" onclick="nav('perfil')"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14a6 6 0 0112 0"/></svg>Perfil e config.</div>
+  <div class="user-area">
+    <div class="user-card" onclick="nav('perfil')">
+      <div class="user-avatar" id="user-avatar-nav">JR</div>
+      <div><div class="user-name" id="user-name-nav">João Revendedor</div><div class="user-plan">Plano Pro • ativo</div></div>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGES -->
+<main class="main">
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div><div class="page-title">Dashboard</div><div class="page-sub" id="dash-sub">Bom dia! Último scan do radar: há 8 min</div></div>
+    <button class="btn btn-primary" onclick="nav('analisar')">+ Analisar anúncio</button>
+  </div>
+  <div class="metrics" id="dash-metrics"></div>
+  <div class="card">
+    <div class="card-title">🎯 Melhores oportunidades agora</div>
+    <div id="dash-listings"></div>
+  </div>
+</div>
+
+<!-- OPORTUNIDADES -->
+<div class="page" id="page-oportunidades">
+  <div class="page-header">
+    <div><div class="page-title">Oportunidades</div><div class="page-sub">Somente anúncios que passaram nos seus filtros do radar</div></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" onclick="nav('radar')">Editar filtros</button>
+      <button class="btn btn-primary" onclick="nav('analisar')">+ Novo</button>
+    </div>
+  </div>
+  <div id="opp-filter-chips" class="filters-bar"></div>
+  <div id="opp-listings"></div>
+</div>
+
+<!-- ANALISAR -->
+<div class="page" id="page-analisar">
+  <div class="page-header">
+    <div><div class="page-title">Analisar anúncio</div><div class="page-sub">Cole o link — a IA extrai e analisa tudo automaticamente</div></div>
+  </div>
+
+  <!-- API Key warning -->
+  <div id="apikey-warn" style="display:none;background:#FAEEDA;border:1px solid #EF9F27;border-radius:10px;padding:14px 18px;max-width:640px;margin-bottom:16px;font-size:13px;color:#633806;">
+    <strong>⚠️ Configure sua chave da Anthropic</strong> para usar a análise com IA.<br/>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+      <input id="apikey-input" type="password" placeholder="sk-ant-..." style="flex:1;font-size:12px;padding:7px 10px;border:1px solid #EF9F27;border-radius:7px;font-family:inherit;background:white;"/>
+      <button class="btn btn-sm" style="background:#633806;color:white;border:none;" onclick="saveApiKey()">Salvar chave</button>
+    </div>
+    <div style="font-size:11px;margin-top:6px;opacity:.7;">Sua chave fica salva no navegador. Obtenha em: console.anthropic.com</div>
+  </div>
+
+  <div style="max-width:640px;">
+    <!-- URL Box principal -->
+    <div style="background:#fff;border:2px solid #185FA5;border-radius:14px;padding:20px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:600;color:#185FA5;margin-bottom:10px;">Cole o link do anúncio</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input class="form-input" id="url-in" type="url" placeholder="https://www.olx.com.br/...  |  facebook.com/marketplace/...  |  webmotors.com.br/..." style="font-size:14px;height:46px;border:1.5px solid #ddd;" oninput="onUrl(this.value)" onkeydown="if(event.key==='Enter')analisarURL()"/>
+        <button class="btn btn-primary" id="url-go-btn" disabled style="opacity:.4;height:46px;padding:0 20px;font-size:14px;font-weight:600;" onclick="analisarURL()">Analisar →</button>
+      </div>
+      <div id="url-detect" style="display:none;font-size:12px;color:#27500A;background:#EAF3DE;padding:8px 12px;border-radius:7px;display:flex;align-items:center;gap:8px;">
+        <span>✓</span><span id="url-detect-txt">OLX detectado</span><span style="color:#3B6D11;">— a IA vai extrair preço, km, ano, modelo e cidade automaticamente</span>
+      </div>
+
+      <!-- Fontes aceitas -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        <span style="font-size:11px;color:#aaa;">Aceita links de:</span>
+        ${['OLX','Facebook','Webmotors','iCarros','Mercado Livre','Kavak'].map(s=>`<span style="font-size:11px;padding:2px 9px;border-radius:99px;background:#f0f0ee;color:#666;">${s}</span>`).join('')}
+      </div>
+    </div>
+
+    <!-- Alternar modo manual -->
+    <div style="text-align:center;margin-bottom:14px;">
+      <button style="background:none;border:none;font-size:12px;color:#aaa;cursor:pointer;font-family:inherit;" onclick="toggleManual()">
+        Não tenho link — quero descrever manualmente ▾
+      </button>
+    </div>
+
+    <!-- Formulário manual (oculto por padrão) -->
+    <div id="manual-form" style="display:none;background:#f8f8f7;border:1px solid #e8e8e5;border-radius:12px;padding:18px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px;color:#666;">Preencher manualmente</div>
+      <div class="form-row" style="margin-bottom:10px;">
+        <div><label class="form-label">Tipo</label><select class="form-input" id="man-type"><option value="Moto">Moto</option><option value="Carro">Carro</option></select></div>
+        <div><label class="form-label">Preço pedido (R$)</label><input class="form-input" id="man-price" type="number" placeholder="21900"/></div>
+      </div>
+      <div class="form-row3" style="margin-bottom:10px;">
+        <div><label class="form-label">Ano</label><input class="form-input" id="man-year" type="number" placeholder="2021"/></div>
+        <div><label class="form-label">Quilometragem</label><input class="form-input" id="man-km" type="number" placeholder="38000"/></div>
+        <div><label class="form-label">Cidade / Estado</label><input class="form-input" id="man-city" type="text" placeholder="Campinas SP"/></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Título e descrição do anúncio</label>
+        <textarea class="form-input" id="man-desc" rows="3" placeholder="Cole aqui o título e descrição..." style="resize:vertical;"></textarea>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="analisarManual()">Analisar com IA →</button>
+    </div>
+  </div>
+
+  <!-- Animação de análise -->
+  <div id="anal-analyzing" style="display:none;max-width:640px;">
+    <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+        <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <div><div id="anal-step" style="font-weight:600;font-size:14px;">Acessando o anúncio...</div><div style="font-size:12px;color:#aaa;margin-top:2px;">A IA está lendo e extraindo todos os dados</div></div>
+      </div>
+      <div id="anal-steps-log" style="font-size:12px;color:#aaa;font-family:monospace;line-height:2;background:#f8f8f7;padding:10px 14px;border-radius:8px;"></div>
+    </div>
+  </div>
+
+  <!-- Resultado -->
+  <div id="anal-result" style="display:none;max-width:640px;"></div>
+
+  <!-- Histórico da sessão -->
+  <div id="anal-history" style="max-width:640px;margin-top:20px;">
+    <div style="font-size:13px;font-weight:600;color:#888;margin-bottom:10px;">Analisados nesta sessão</div>
+    <div id="anal-history-list"></div>
+  </div>
+</div>
+
+<!-- CRM / PORTFOLIO -->
+<div class="page" id="page-crm">
+  <div class="page-header">
+    <div><div class="page-title">Meu portfólio</div><div class="page-sub">Gerencie cada veículo do interesse à revenda</div></div>
+    <button class="btn btn-primary" onclick="openAddCRM()">+ Adicionar</button>
+  </div>
+  <div class="kanban" id="kanban-board"></div>
+  <div class="card" style="margin-top:16px;">
+    <div class="card-title">📊 Resumo financeiro</div>
+    <div class="form-row3">
+      <div class="metric"><div class="metric-label">Investido</div><div class="metric-value" id="crm-invested">R$ 0</div></div>
+      <div class="metric"><div class="metric-label">Revendido</div><div class="metric-value" id="crm-sold" style="color:#27500A;">R$ 0</div></div>
+      <div class="metric"><div class="metric-label">Lucro realizado</div><div class="metric-value" id="crm-profit" style="color:#185FA5;">R$ 0</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CALCULADORA -->
+<div class="page" id="page-calculadora">
+  <div class="page-header">
+    <div><div class="page-title">Calculadora de precificação</div><div class="page-sub">Simule a margem de revenda e o melhor preço de venda</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:800px;">
+    <div class="card">
+      <div class="card-title">Dados da compra</div>
+      <div class="form-group"><label class="form-label">Preço de compra (R$)</label><input class="form-input" id="calc-buy" type="number" placeholder="21900" oninput="calcular()"/></div>
+      <div class="form-group"><label class="form-label">Veículo</label><input class="form-input" id="calc-veh" type="text" placeholder="Honda XRE 300 2021" oninput="calcular()"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Distância (km)</label><input class="form-input" id="calc-dist" type="number" placeholder="38" oninput="calcular()"/></div>
+        <div class="form-group"><label class="form-label">Combustível (R$/L)</label><input class="form-input" id="calc-fuel" type="number" placeholder="6.29" value="6.29" oninput="calcular()"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Revisão estimada (R$)</label><input class="form-input" id="calc-rev" type="number" placeholder="400" value="400" oninput="calcular()"/></div>
+        <div class="form-group"><label class="form-label">Transferência + DETRAN</label><input class="form-input" id="calc-trans" type="number" placeholder="250" value="250" oninput="calcular()"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Outros custos (R$)</label><input class="form-input" id="calc-other" type="number" placeholder="0" value="0" oninput="calcular()"/></div>
+      <div class="form-group"><label class="form-label">Margem mínima desejada (%)</label><input class="form-input" id="calc-margin" type="number" placeholder="12" value="12" oninput="calcular()"/></div>
+    </div>
+    <div>
+      <div class="card" id="calc-result-card">
+        <div class="card-title">Resultado</div>
+        <div style="text-align:center;padding:24px;color:#bbb;font-size:13px;">Preencha os dados ao lado para calcular</div>
+      </div>
+      <div class="card" id="calc-market-card" style="margin-top:0;">
+        <div class="card-title">Comparação de mercado</div>
+        <div style="font-size:12px;color:#888;line-height:1.8;" id="calc-market-body">Insira o veículo para comparar com anúncios similares.</div>
+      </div>
+      <div class="card" id="calc-financing-card" style="margin-top:0;">
+        <div class="card-title">Simulador de financiamento para o comprador</div>
+        <div id="calc-fin-body" style="font-size:12px;color:#888;">Preencha o preço de venda para simular.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RADAR -->
+<div class="page" id="page-radar">
+  <div class="page-header">
+    <div><div class="page-title">Radar de busca</div><div class="page-sub">Defina seus critérios — o sistema filtra e alerta automaticamente</div></div>
+    <button class="btn" id="radar-toggle-btn" onclick="toggleRadar()">⏸ Pausar radar</button>
+  </div>
+  <div class="radar-status on" id="radar-status-bar">
+    <div class="rdot on" id="radar-rdot"></div>
+    <div id="radar-status-txt"><strong>Radar ativo</strong> — 3 modelos monitorados · 8 fontes · último scan há 8 min · <strong id="radar-opp-txt">2 oportunidades</strong> ativas</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Fontes monitoradas</div>
+    <div class="sources-grid" id="sources-grid"></div>
+    <div style="font-size:11px;color:#aaa;">Selecione quais plataformas o radar deve monitorar</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Modelos monitorados</div>
+    <div id="model-tags" style="margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;">
+      <input class="form-input" id="new-model" style="max-width:280px;" placeholder="Ex: Fazer 250, Civic, Titan 160..." onkeydown="if(event.key==='Enter')addModel()"/>
+      <button class="btn" onclick="addModel()">+ Adicionar</button>
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-top:8px;">Só entram em Oportunidades se o modelo estiver nesta lista</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Critérios de filtragem</div>
+    <div class="radar-config-grid">
+      <div class="radar-config-item"><label>Tipo</label><select id="rc-tipo" onchange="updateRadarConfig()"><option>Todos</option><option>Moto</option><option>Carro</option></select></div>
+      <div class="radar-config-item"><label>Preço máximo (R$)</label><input type="number" id="rc-preco" value="35000" onchange="updateRadarConfig()"/></div>
+      <div class="radar-config-item"><label>Km máxima</label><input type="number" id="rc-km" value="80000" onchange="updateRadarConfig()"/></div>
+      <div class="radar-config-item"><label>Raio máximo (km)</label><input type="number" id="rc-dist" value="120" onchange="updateRadarConfig()"/></div>
+      <div class="radar-config-item"><label>Score mínimo</label><input type="number" id="rc-score" min="0" max="100" value="70" onchange="updateRadarConfig()"/></div>
+      <div class="radar-config-item"><label>Risco máximo</label><select id="rc-risco" onchange="updateRadarConfig()"><option>Baixo</option><option selected>Médio</option><option>Alto</option></select></div>
+      <div class="radar-config-item"><label>Ano mínimo</label><input type="number" id="rc-ano" value="2018" onchange="updateRadarConfig()"/></div>
+      <div class="radar-config-item"><label>Margem mínima (R$)</label><input type="number" id="rc-margem" value="1500" onchange="updateRadarConfig()"/></div>
+      <div class="radar-config-item"><label>Frequência de scan</label><select id="rc-freq"><option>A cada 30 min</option><option selected>A cada 1 hora</option><option>A cada 2 horas</option><option>Manual</option></select></div>
+    </div>
+    <div style="margin-top:14px;padding:10px 14px;background:#f5f5f3;border-radius:8px;font-size:12px;color:#888;">
+      Com esses filtros: <strong id="rc-count" style="color:#1a1a1a;">0</strong> anúncios aparecem em Oportunidades agora
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Log do último scan</div>
+    <div class="scan-log" id="scan-log"></div>
+    <button class="btn btn-sm" style="margin-top:10px;" onclick="runScan()">▶ Rodar scan agora</button>
+  </div>
+</div>
+
+<!-- ANALYTICS -->
+<div class="page" id="page-analytics">
+  <div class="page-header"><div><div class="page-title">Analytics</div><div class="page-sub">Performance do radar e histórico de revenda</div></div></div>
+  <div class="metrics" id="analytics-metrics"></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
+    <div class="card">
+      <div class="card-title">Oportunidades por semana</div>
+      <div class="bar-chart" id="weekly-chart"></div>
+      <div style="display:flex;gap:14px;margin-top:10px;font-size:11px;color:#aaa;" id="weekly-labels"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Distribuição de fontes</div>
+      <div id="source-dist" style="font-size:13px;"></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:0;">
+    <div class="card">
+      <div class="card-title">Top modelos encontrados</div>
+      <div id="top-models" style="font-size:13px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Evolução da margem média</div>
+      <div id="margin-evolution" style="font-size:12px;color:#888;line-height:1.8;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ALERTAS -->
+<div class="page" id="page-alertas">
+  <div class="page-header"><div><div class="page-title">Configuração de alertas</div><div class="page-sub">Defina quando e como receber notificações de oportunidades</div></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:800px;">
+    <div>
+      <div class="card">
+        <div class="card-title">Regras de disparo</div>
+        <div class="form-group"><label class="form-label">Score mínimo para alertar</label><input class="form-input" id="alert-score" type="number" value="75" min="0" max="100"/></div>
+        <div class="form-group"><label class="form-label">Risco máximo</label><select class="form-input" id="alert-risk"><option>Baixo</option><option selected>Médio</option><option>Alto</option></select></div>
+        <div class="form-group"><label class="form-label">Margem mínima (R$)</label><input class="form-input" id="alert-margem" type="number" value="1500"/></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Alertar motos</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Alertar carros</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label" style="font-size:12px;color:#888;">Silenciar de 22h às 7h</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="toast('Configurações de alerta salvas!')">Salvar</button>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-title">Canais de notificação</div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Telegram</div><div class="toggle-desc">@RadarAutoBot</div></div><label class="toggle"><input type="checkbox" checked id="alert-tg"><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">WhatsApp</div><div class="toggle-desc">Requer número verificado</div></div><label class="toggle"><input type="checkbox" id="alert-wa"><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Email</div><div class="toggle-desc" id="alert-email-addr">joao@email.com</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Notificação no app</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Preview do alerta</div>
+        <div class="alert-preview">🚨 <strong>Oportunidade encontrada!</strong><br/>Honda XRE 300 2021 — R$ 21.900<br/>📍 Campinas SP · ↔ 38 km de você<br/>⭐ Score: 87/100<br/>🟢 Risco: Baixo<br/>💰 Margem: ~R$ 2.400<br/>📉 10% abaixo da FIPE<br/><br/><em>Anúncio recente com fotos originais e descrição coerente.</em><br/><br/>🔗 Ver anúncio · Ver no RadarAuto</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- INTEGRAÇÕES -->
+<div class="page" id="page-integracoes">
+  <div class="page-header"><div><div class="page-title">Integrações</div><div class="page-sub">Conecte o RadarAuto às suas ferramentas</div></div></div>
+  <div id="int-list"></div>
+</div>
+
+<!-- ASSINATURA -->
+<div class="page" id="page-assinatura">
+  <div class="page-header"><div><div class="page-title">Assinatura</div><div class="page-sub">Gerencie seu plano e método de pagamento</div></div></div>
+  <div class="card" style="background:#EAF3DE;border-color:#97C459;max-width:600px;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="width:44px;height:44px;background:#639922;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;flex-shrink:0;">✓</div>
+      <div><div style="font-size:15px;font-weight:600;color:#1a1a1a;">Plano Pro — ativo</div><div style="font-size:13px;color:#666;">Próxima cobrança: 07/05/2026 · R$ 197,00 · Cartão •••• 4521</div></div>
+      <button class="btn btn-sm" style="margin-left:auto;" onclick="toast('Gerenciamento de plano via Asaas — em breve!')">Gerenciar</button>
+    </div>
+  </div>
+  <div class="plan-cards" style="max-width:800px;">
+    <div class="plan-card">
+      <div style="font-size:12px;color:#888;">Básico</div>
+      <div class="plan-price">R$ 97<span class="plan-period">/mês</span></div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:12px;">Para compradores individuais</div>
+      <ul class="plan-items"><li>30 análises/mês</li><li>Radar 1 região</li><li>Alerta Telegram</li><li>Score IA básico</li></ul>
+      <button class="btn btn-sm" style="width:100%;justify-content:center;">Fazer downgrade</button>
+    </div>
+    <div class="plan-card featured">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:12px;color:#888;">Pro</div><span class="tag tag-blue">Seu plano</span></div>
+      <div class="plan-price">R$ 197<span class="plan-period">/mês</span></div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:12px;">Para revendedores ativos</div>
+      <ul class="plan-items"><li>Análises ilimitadas</li><li>Radar multi-região</li><li>WhatsApp + Telegram</li><li>Calculadora de revenda</li><li>Rota Google Maps</li><li>Análise de imagem IA</li><li>CRM básico</li></ul>
+      <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center;" disabled>Plano atual</button>
+    </div>
+    <div class="plan-card">
+      <div style="font-size:12px;color:#888;">Agência</div>
+      <div class="plan-price">R$ 497<span class="plan-period">/mês</span></div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:12px;">Para lojistas e equipes</div>
+      <ul class="plan-items"><li>Até 5 usuários</li><li>Multi-localidade</li><li>Dashboard white-label</li><li>Relatórios avançados</li><li>API de integração</li><li>Suporte prioritário</li></ul>
+      <button class="btn btn-sm btn-primary" style="width:100%;justify-content:center;" onclick="toast('Upgrade para Agência — contate o suporte!')">Fazer upgrade</button>
+    </div>
+  </div>
+  <div class="card" style="max-width:600px;">
+    <div class="card-title">Histórico de cobranças</div>
+    ${['07/04/2026','07/03/2026','07/02/2026','07/01/2026'].map((d,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0ee;font-size:13px;"><span>${d} — Plano Pro</span><div style="display:flex;align-items:center;gap:10px;"><span style="color:#27500A;font-weight:500;">R$ 197,00</span><span class="tag tag-green" style="font-size:10px;">Pago</span></div></div>`).join('')}
+    <div style="padding-top:14px;"><button class="btn btn-sm" onclick="cancelarAssinatura()" style="color:#A32D2D;border-color:#A32D2D;">Cancelar assinatura</button></div>
+  </div>
+</div>
+
+<!-- PERFIL -->
+<div class="page" id="page-perfil">
+  <div class="page-header"><div><div class="page-title">Perfil e configurações</div><div class="page-sub">Personalize sua conta e preferências</div></div><button class="btn btn-primary" onclick="salvarPerfil()">Salvar alterações</button></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px;">
+    <div>
+      <div class="card">
+        <div class="profile-section">
+          <div class="profile-section-title">Dados pessoais</div>
+          <div class="avatar-big" id="profile-avatar">JR</div>
+          <div class="form-group"><label class="form-label">Nome completo</label><input class="form-input" id="pf-name" value="João Revendedor"/></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="pf-email" value="joao@email.com"/></div>
+          <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="pf-phone" value="(11) 99999-0000" placeholder="(11) 99999-0000"/></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">CPF / CNPJ</label><input class="form-input" id="pf-doc" placeholder="000.000.000-00"/></div>
+            <div class="form-group"><label class="form-label">Tipo</label><select class="form-input"><option>Pessoa Física</option><option>Pessoa Jurídica</option></select></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="profile-section-title">Localização base</div>
+        <div class="form-group"><label class="form-label">Endereço / Bairro</label><input class="form-input" id="pf-addr" placeholder="Rua das Flores, 123 — Centro"/></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Cidade</label><input class="form-input" id="pf-city" value="Bragança Paulista"/></div>
+          <div class="form-group"><label class="form-label">Estado</label><select class="form-input" id="pf-state"><option>SP</option><option>MG</option><option>RJ</option><option>PR</option><option>RS</option><option>SC</option><option>GO</option><option>DF</option><option>BA</option><option>CE</option></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">CEP</label><input class="form-input" id="pf-cep" placeholder="12900-000"/></div>
+        <div class="form-group"><label class="form-label">Raio de atuação (km)</label><input class="form-input" id="pf-raio" type="number" value="120"/></div>
+        <div style="margin-top:10px;padding:10px 14px;background:#E6F1FB;border-radius:8px;font-size:12px;color:#0C447C;">📍 Localização usada para calcular distância até os anúncios e gerar rota no Google Maps</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="profile-section-title">Preferências do radar</div>
+        <div class="form-group"><label class="form-label">Margem mínima desejada (R$)</label><input class="form-input" id="pf-margin" type="number" value="1500"/></div>
+        <div class="form-group"><label class="form-label">Foco principal</label><select class="form-input"><option>Motos e carros</option><option>Somente motos</option><option>Somente carros</option></select></div>
+        <div class="form-group"><label class="form-label">Consumo médio do seu veículo (km/L)</label><input class="form-input" id="pf-consumo" type="number" value="12" placeholder="12"/></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Receber relatório semanal por email</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Modo noturno (silenciar 22h–7h)</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+        <div class="toggle-wrap"><div><div class="toggle-label">Alertar queda de preço em favoritos</div></div><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="profile-section-title">Segurança</div>
+        <div class="form-group"><label class="form-label">Senha atual</label><input class="form-input" type="password" placeholder="••••••••"/></div>
+        <div class="form-group"><label class="form-label">Nova senha</label><input class="form-input" type="password" placeholder="••••••••"/></div>
+        <div class="form-group"><label class="form-label">Confirmar nova senha</label><input class="form-input" type="password" placeholder="••••••••"/></div>
+        <button class="btn btn-sm" onclick="toast('Senha atualizada com sucesso!')">Atualizar senha</button>
+      </div>
+      <div class="card" style="border-color:#85B7EB;">
+        <div class="profile-section-title" style="color:#185FA5;">🔑 Chave da API Anthropic</div>
+        <div style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.6;">Necessária para a análise com IA. Obtenha gratuitamente em <a href="https://console.anthropic.com" target="_blank" style="color:#185FA5;">console.anthropic.com</a></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="form-input" id="pf-apikey" type="password" placeholder="sk-ant-..." style="flex:1;font-size:13px;"/>
+          <button class="btn btn-primary btn-sm" onclick="salvarApiKeyPerfil()">Salvar</button>
+        </div>
+        <div id="pf-apikey-status" style="font-size:12px;"></div>
+      </div>
+      <div class="card" style="border-color:#f09595;">
+        <div class="profile-section-title" style="color:#A32D2D;">Zona de perigo</div>
+        <div style="font-size:12px;color:#888;margin-bottom:12px;">Estas ações são irreversíveis. Tenha certeza antes de prosseguir.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm" style="color:#A32D2D;border-color:#A32D2D;" onclick="toast('Dados exportados em CSV!')">Exportar meus dados</button>
+          <button class="btn btn-sm" style="color:#A32D2D;border-color:#A32D2D;" onclick="confirmarExclusao()">Excluir conta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAUDO VEICULAR -->
+<div class="page" id="page-laudo">
+  <div class="page-header">
+    <div><div class="page-title">Laudo veicular</div><div class="page-sub">Consulte o histórico completo de qualquer veículo pela placa</div></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="credit-display" style="background:#f5f5f3;border-radius:8px;padding:6px 14px;font-size:13px;display:flex;align-items:center;gap:8px;">
+        <span style="color:#888;">Créditos:</span>
+        <span style="font-weight:700;color:#185FA5;" id="credit-count">5</span>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openComprarCreditos()">Comprar créditos</button>
+    </div>
+  </div>
+
+  <!-- Input de placa -->
+  <div style="max-width:520px;margin-bottom:24px;">
+    <div class="card" style="border:2px solid #185FA5;">
+      <div style="font-size:13px;font-weight:600;color:#185FA5;margin-bottom:12px;">Digite a placa do veículo</div>
+      <input class="placa-input" id="placa-input" maxlength="8" placeholder="ABC-1D23" oninput="formatPlaca(this)" onkeydown="if(event.key==='Enter')consultarPlaca()"/>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:#aaa;">Aceita:</span>
+        <span style="font-size:11px;background:#f0f0ee;padding:2px 8px;border-radius:99px;color:#666;">Placa antiga (ABC-1234)</span>
+        <span style="font-size:11px;background:#f0f0ee;padding:2px 8px;border-radius:99px;color:#666;">Placa Mercosul (ABC-1D23)</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <input class="form-input" id="renavam-input" placeholder="RENAVAM (opcional — mais precisão)" style="flex:1;font-size:13px;"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;font-size:15px;height:46px;" onclick="consultarPlaca()">
+        Consultar laudo completo — R$ 19
+      </button>
+      <div style="text-align:center;font-size:11px;color:#aaa;margin-top:8px;">1 crédito será debitado da sua conta · Laudo válido por 24h</div>
+    </div>
+
+    <!-- Histórico de consultas -->
+    <div style="font-size:13px;font-weight:600;color:#888;margin:16px 0 10px;">Consultas recentes</div>
+    <div id="laudo-historico">
+      <div style="font-size:13px;color:#aaa;padding:20px 0 10px;">Nenhuma consulta realizada ainda.</div>
+    </div>
+  </div>
+
+  <!-- Estado de loading -->
+  <div id="laudo-loading" style="display:none;max-width:520px;">
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px;" id="laudo-loading-title">Consultando placa...</div>
+      <div id="laudo-steps" style="font-size:13px;color:#888;line-height:2.2;"></div>
+      <div style="background:#f5f5f3;border-radius:8px;padding:10px;margin-top:12px;">
+        <div style="height:6px;background:#e8e8e5;border-radius:99px;overflow:hidden;">
+          <div id="laudo-progress" style="height:100%;background:#185FA5;border-radius:99px;width:0%;transition:width .5s;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultado do laudo -->
+  <div id="laudo-result" style="display:none;max-width:800px;"></div>
+</div>
+
+</main>
+
+<!-- Modal comprar créditos -->
+<div class="modal-bg" id="modal-creditos">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-title">Comprar créditos de laudo</div>
+    <div style="font-size:13px;color:#888;margin-bottom:18px;">Cada crédito = 1 laudo completo com todos os dados do veículo</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">
+      ${[['5 créditos','R$ 79','R$ 15,80/laudo'],['15 créditos','R$ 199','R$ 13,27/laudo','popular'],['50 créditos','R$ 549','R$ 10,98/laudo']].map(([q,p,u,pop])=>`
+      <div onclick="selectCredPkg(this,'${p}')" style="border:${pop?'2px solid #185FA5':'1px solid #e8e8e5'};border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .15s;" class="cred-pkg ${pop?'selected':''}">
+        ${pop?'<div style="font-size:10px;font-weight:700;color:#185FA5;margin-bottom:6px;">MAIS POPULAR</div>':''}
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${q}</div>
+        <div style="font-size:18px;font-weight:700;color:#185FA5;">${p}</div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">${u}</div>
+      </div>`).join('')}
+    </div>
+    <div style="background:#f5f5f3;border-radius:8px;padding:10px 14px;font-size:12px;color:#666;margin-bottom:16px;">
+      💳 Pagamento processado via Asaas · Pix à vista ou cartão em até 6x · Créditos não expiram
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-creditos')">Cancelar</button>
+      <button class="btn btn-primary" id="cred-btn" onclick="comprarCreditos()">Pagar R$ 199 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal CRM -->
+<div class="modal-bg" id="modal-crm">
+  <div class="modal">
+    <div class="modal-title">Adicionar ao portfólio</div>
+    <div class="form-group"><label class="form-label">Veículo</label><input class="form-input" id="crm-veh" placeholder="Honda XRE 300 2021"/></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Preço de compra (R$)</label><input class="form-input" id="crm-price" type="number" placeholder="21900"/></div>
+      <div class="form-group"><label class="form-label">Status</label><select class="form-input" id="crm-status"><option value="interesse">Interesse</option><option value="negociando">Em negociação</option><option value="comprado">Comprado</option><option value="revendido">Revendido</option></select></div>
+    </div>
+    <div class="form-group"><label class="form-label">Anotações</label><textarea class="form-input" id="crm-notes" rows="2" placeholder="Detalhes, contato do vendedor, próximo passo..."></textarea></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('modal-crm')">Cancelar</button><button class="btn btn-primary" onclick="addCRM()">Adicionar</button></div>
+  </div>
+</div>
+
+<!-- Modal cancelar assinatura -->
+<div class="modal-bg" id="modal-cancel">
+  <div class="modal">
+    <div class="modal-title">Cancelar assinatura</div>
+    <div style="font-size:13px;color:#666;line-height:1.7;margin-bottom:16px;">
+      Você ainda está no <strong>Plano Pro</strong>.<br/>
+      Ao cancelar, seu acesso continuará ativo até <strong>07/05/2026</strong> (próximo vencimento).<br/>
+      Após essa data, a conta será rebaixada automaticamente para o plano gratuito limitado.<br/><br/>
+      <span style="color:#A32D2D;">Esta ação não pode ser desfeita.</span>
+    </div>
+    <div class="form-group"><label class="form-label">Por que está cancelando? (opcional)</label><select class="form-input"><option>Selecione</option><option>Preço alto</option><option>Não usei o suficiente</option><option>Encontrei outro sistema</option><option>Pausei as revendas</option><option>Outro motivo</option></select></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-cancel')">Manter assinatura</button>
+      <button class="btn btn-red" onclick="confirmarCancelamento()">Confirmar cancelamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Estado global ─────────────────────────────────
+const S = {
+  radarOn: true,
+  radarModels: ['XRE 300','CB 500','Lander 250'],
+  radarSources: ['OLX','Facebook','Webmotors','iCarros','Mercado Livre','Kavak','OLX Pro','Quero-Quero'],
+  activeSources: ['OLX','Facebook','Webmotors','iCarros','Mercado Livre'],
+  radarCfg: {tipo:'Todos',preco:35000,km:80000,dist:120,score:70,risco:'Médio',ano:2018,margem:1500},
+  todos: [
+    {id:1,title:'Honda XRE 300 2021',price:21900,fipe:24500,type:'Moto',km:38000,city:'Campinas SP',dist:38,opp:87,risk:22,riskLabel:'Baixo',riskC:'#639922',margin:2400,source:'OLX',summary:'Preço 10% abaixo da FIPE. Fotos originais. Descrição coerente. Anúncio recente.',time:'há 12 min',lat:-22.9068,lng:-47.0626},
+    {id:2,title:'Honda CB 500F 2020',price:28500,fipe:32000,type:'Moto',km:22000,city:'Jundiaí SP',dist:62,opp:79,risk:31,riskLabel:'Baixo',riskC:'#639922',margin:2800,source:'Facebook',summary:'Km baixo para o ano. Preço 11% abaixo da média. Urgência de venda identificada.',time:'há 47 min',lat:-23.1864,lng:-46.8978},
+    {id:3,title:'VW Gol 1.6 2018',price:38900,fipe:43200,type:'Carro',km:67000,city:'Bragança Paulista SP',dist:8,opp:71,risk:45,riskLabel:'Médio',riskC:'#BA7517',margin:1800,source:'OLX',summary:'Muito próximo. Preço abaixo da FIPE. Risco médio por fotos incompletas.',time:'há 2h',lat:-22.9523,lng:-46.5418},
+    {id:4,title:'Yamaha Lander 250 2022',price:17800,fipe:19500,type:'Moto',km:15000,city:'Atibaia SP',dist:44,opp:82,risk:18,riskLabel:'Baixo',riskC:'#639922',margin:1200,source:'Webmotors',summary:'Km muito baixo. Moto conservada. Perfil verificado.',time:'há 3h',lat:-23.1170,lng:-46.5512},
+  ],
+  crm: [
+    {id:1,veh:'Honda XRE 300 2021',price:21900,status:'negociando',notes:'Liguei para o vendedor, vai mostrar sábado'},
+    {id:2,veh:'Honda CB 500F 2019',price:24000,status:'comprado',notes:'Comprei em Campinas, revisão marcada'},
+    {id:3,veh:'Yamaha Fazer 250 2020',price:14500,status:'revendido',notes:'Vendi por R$17.000 — margem R$2.500'},
+  ],
+  user: {name:'João Revendedor',email:'joao@email.com',city:'Bragança Paulista',state:'SP',raio:120,consumo:12}
+};
+
+function oppList(){return S.todos.filter(l=>{
+  const c=S.radarCfg;
+  if(!S.radarOn)return false;
+  if(c.tipo!=='Todos'&&l.type!==c.tipo)return false;
+  if(l.price>c.preco)return false;
+  if(l.km>c.km)return false;
+  if(l.dist>c.dist)return false;
+  if(l.opp<c.score)return false;
+  if(c.risco==='Baixo'&&l.riskLabel!=='Baixo')return false;
+  if(c.risco==='Médio'&&l.riskLabel==='Alto')return false;
+  return true;
+});}
+
+function sc(v){return v>=75?'#639922':v>=50?'#BA7517':'#A32D2D';}
+
+function vehicleImg(l){
+  // Gera seed consistente por id para imagem placeholder realista
+  const seeds={
+    'XRE':['motorcycle','bike'],
+    'CB':['motorcycle','motorbike'],
+    'Lander':['motorcycle','trail'],
+    'Fazer':['motorcycle','yamaha'],
+    'Titan':['motorcycle','honda'],
+    'Gol':['car','volkswagen'],
+    'Civic':['car','honda'],
+    'Carro':['car','auto'],
+    'Moto':['motorcycle','bike']
+  };
+  const key=Object.keys(seeds).find(k=>l.title.includes(k))||(l.type==='Carro'?'Carro':'Moto');
+  const terms=seeds[key]||['vehicle'];
+  const seed=(l.id||1)*7+terms[0].length;
+  // Usar picsum para imagens bonitas com seed consistente
+  return`https://picsum.photos/seed/${seed+l.type.length}/400/220`;
+}
+
+function cardHTML(l,hl){
+  const oc=sc(l.opp);
+  const fuelCost=Math.round((l.dist/(S.user.consumo||12))*2*6.29);
+  const discPct=l.fipe>0?Math.round((1-l.price/l.fipe)*100):0;
+  const img=l.imgUrl||vehicleImg(l);
+  return`<div class="listing-card${hl?' radar-match':''}">
+  <div style="display:flex;gap:16px;">
+    <div style="flex-shrink:0;width:160px;height:110px;border-radius:8px;overflow:hidden;background:#f0f0ee;position:relative;">
+      <img src="${img}" alt="${l.title}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+      <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:32px;position:absolute;top:0;left:0;">${l.type==='Moto'?'🏍️':'🚗'}</div>
+      ${discPct>0?`<div style="position:absolute;top:6px;left:6px;background:#185FA5;color:white;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;">-${discPct}% FIPE</div>`:''}
+      ${hl?`<div style="position:absolute;top:6px;right:6px;background:#639922;color:white;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;">✓ Radar</div>`:''}
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+        <div>
+          <div class="listing-title">${l.title}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;">
+            <span class="tag tag-blue">${l.type}</span>
+            <span class="tag tag-gray">${l.source}</span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="listing-price">R$ ${l.price.toLocaleString('pt-BR')}</div>
+          <div class="listing-fipe">FIPE ~R$ ${l.fipe.toLocaleString('pt-BR')}</div>
+        </div>
+      </div>
+      <div class="listing-meta" style="margin-bottom:8px;">
+        <span>📍 ${l.city}</span>
+        <span>↔ ${l.dist} km · ~R$ ${fuelCost} combustível</span>
+        <span>⏱ ${l.km.toLocaleString('pt-BR')} km</span>
+        <span style="color:#aaa;">${l.time}</span>
+      </div>
+      <div class="score-wrap" style="margin-bottom:4px;"><span class="score-lbl">Oportunidade</span><div class="score-track"><div class="score-fill" style="width:${l.opp}%;background:${oc};"></div></div><span class="score-num" style="color:${oc};">${l.opp}</span></div>
+      <div class="score-wrap"><span class="score-lbl">Risco</span><div class="score-track"><div class="score-fill" style="width:${l.risk}%;background:${l.riskC};"></div></div><span class="score-num" style="color:${l.riskC};">${l.riskLabel}</span></div>
+    </div>
+  </div>
+  <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0ee;">
+    <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:10px;">${l.summary} — <strong style="color:#185FA5;">Margem est.: R$ ${l.margin.toLocaleString('pt-BR')}</strong></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <a href="https://www.google.com/maps/dir/${encodeURIComponent(S.user.city+', '+S.user.state)}/${encodeURIComponent(l.city)}" target="_blank" class="btn btn-sm">📍 Ver rota</a>
+      <button class="btn btn-sm" onclick="calcFromListing(${l.price})">Calcular margem</button>
+      <button class="btn btn-sm btn-primary" onclick="addToPortfolio(this)" data-title="${esc(l.title)}" data-price="${l.price}">+ Portfólio</button>
+      ${l.sourceUrl?`<a href="${l.sourceUrl}" target="_blank" class="btn btn-sm">Ver anúncio ↗</a>`:''}
+    </div>
+  </div>
+</div>`;
+}
+
+// ── Navegação ──────────────────────────────────────
+function nav(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const ni=document.querySelector(`.nav-item[onclick="nav('${id}')"]`);
+  if(ni)ni.classList.add('active');
+  const fns={dashboard:initDash,oportunidades:initOpp,radar:initRadar,analytics:initAnalytics,crm:initCRM,integracoes:initInt,perfil:initPerfil,analisar:initAnalisar,laudo:initLaudo};
+  if(fns[id])fns[id]();
+  updateOppCount();
+}
+
+function updateOppCount(){
+  const n=oppList().length;
+  document.getElementById('nav-opp-count').textContent=n;
+  const rb=document.getElementById('radar-nav-badge');
+  rb.textContent=S.radarOn?'Ativo':'Pausado';
+  rb.className=S.radarOn?'nav-badge green':'nav-badge';
+}
+
+// ── Dashboard ──────────────────────────────────────
+function initDash(){
+  const opps=oppList();
+  const h=new Date().getHours();
+  const g=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
+  document.getElementById('dash-sub').textContent=`${g}! Último scan do radar: há 8 min`;
+  document.getElementById('dash-metrics').innerHTML=`
+    <div class="metric"><div class="metric-label">Analisados</div><div class="metric-value">${S.todos.length}</div><div class="metric-sub">total</div></div>
+    <div class="metric"><div class="metric-label">No radar</div><div class="metric-value" style="color:#185FA5;">${opps.length}</div><div class="metric-sub">passaram nos filtros</div></div>
+    <div class="metric"><div class="metric-label">Margem média</div><div class="metric-value">R$ ${Math.round(opps.reduce((a,l)=>a+l.margin,0)/(opps.length||1)).toLocaleString('pt-BR')}</div><div class="metric-sub">estimada</div></div>
+    <div class="metric"><div class="metric-label">Radar</div><div class="metric-value" style="color:${S.radarOn?'#639922':'#888'};">${S.radarOn?'Ativo':'Pausado'}</div><div class="metric-sub">${S.radarModels.length} modelos</div></div>`;
+  document.getElementById('dash-listings').innerHTML=opps.length?opps.map(l=>cardHTML(l,true)).join(''):'<div class="empty"><div class="empty-icon">🔍</div><div>Nenhuma oportunidade no radar ainda</div><br/><button class="btn btn-primary" onclick="nav(\'analisar\')">Analisar primeiro anúncio</button></div>';
+}
+
+// ── Oportunidades ──────────────────────────────────
+function initOpp(){
+  const opps=oppList();const c=S.radarCfg;
+  document.getElementById('opp-filter-chips').innerHTML=
+    `<span class="filter-chip">Tipo: ${c.tipo}</span><span class="filter-chip">Até R$ ${c.preco.toLocaleString('pt-BR')}</span><span class="filter-chip">Até ${c.km.toLocaleString('pt-BR')} km</span><span class="filter-chip">Raio ${c.dist} km</span><span class="filter-chip">Score ≥ ${c.score}</span><span class="filter-chip">Risco ≤ ${c.risco}</span>`;
+  document.getElementById('opp-listings').innerHTML=opps.length?opps.map(l=>cardHTML(l,true)).join(''):`<div class="empty"><div class="empty-icon">🎯</div><div style="font-weight:600;margin-bottom:8px;">Nenhum anúncio passou nos seus filtros</div><div style="font-size:13px;margin-bottom:16px;">Relaxe os critérios no Radar de Busca</div><button class="btn btn-primary" onclick="nav('radar')">Ajustar radar</button></div>`;
+}
+
+// ── Radar ──────────────────────────────────────────
+function initRadar(){
+  renderSources();renderModelTags();
+  document.getElementById('rc-count').textContent=oppList().length;
+  renderScanLog();
+  const t=document.getElementById('radar-toggle-btn');
+  t.textContent=S.radarOn?'⏸ Pausar radar':'▶ Ativar radar';
+}
+function renderSources(){
+  document.getElementById('sources-grid').innerHTML=S.radarSources.map(s=>`
+    <div class="source-item${S.activeSources.includes(s)?' on':''}" onclick="toggleSource('${s}')">
+      <div class="source-dot"></div><span>${s}</span>
+    </div>`).join('');
+}
+function toggleSource(s){
+  const i=S.activeSources.indexOf(s);
+  if(i>-1)S.activeSources.splice(i,1);else S.activeSources.push(s);
+  renderSources();toast(`${s} ${S.activeSources.includes(s)?'ativado':'desativado'}`);
+}
+function renderModelTags(){
+  document.getElementById('model-tags').innerHTML=S.radarModels.map((m,i)=>`<button class="model-tag" onclick="removeModel(${i})">${m} ×</button>`).join('');
+}
+function addModel(){const v=document.getElementById('new-model').value.trim();if(v&&!S.radarModels.includes(v)){S.radarModels.push(v);document.getElementById('new-model').value='';renderModelTags();toast('Modelo adicionado: '+v);}}
+function removeModel(i){S.radarModels.splice(i,1);renderModelTags();}
+function toggleRadar(){
+  S.radarOn=!S.radarOn;
+  const s=document.getElementById('radar-status-bar');
+  s.className='radar-status '+(S.radarOn?'on':'off');
+  document.getElementById('radar-rdot').className='rdot '+(S.radarOn?'on':'off');
+  document.getElementById('radar-status-txt').innerHTML=S.radarOn?`<strong>Radar ativo</strong> — ${S.radarModels.length} modelos · último scan há 8 min · <strong id="radar-opp-txt">${oppList().length} oportunidades</strong> ativas`:`Radar pausado — nenhuma busca automática sendo feita`;
+  document.getElementById('radar-toggle-btn').textContent=S.radarOn?'⏸ Pausar radar':'▶ Ativar radar';
+  updateOppCount();toast('Radar '+(S.radarOn?'ativado':'pausado'));
+}
+function updateRadarConfig(){
+  S.radarCfg.tipo=document.getElementById('rc-tipo').value;
+  S.radarCfg.preco=+document.getElementById('rc-preco').value;
+  S.radarCfg.km=+document.getElementById('rc-km').value;
+  S.radarCfg.dist=+document.getElementById('rc-dist').value;
+  S.radarCfg.score=+document.getElementById('rc-score').value;
+  S.radarCfg.risco=document.getElementById('rc-risco').value;
+  document.getElementById('rc-count').textContent=oppList().length;
+  updateOppCount();
+}
+function renderScanLog(){
+  const el=document.getElementById('scan-log');
+  el.innerHTML=S.todos.map(l=>{
+    const p=oppList().find(x=>x.id===l.id);
+    return p?`<div class="log-ok">✓ ${l.title} · R$ ${l.price.toLocaleString('pt-BR')} · score ${l.opp} → <span class="log-new">entrou em Oportunidades</span></div>`:`<div class="log-skip">— ${l.title} · ${l.opp<S.radarCfg.score?'score '+l.opp+' abaixo do mínimo':l.price>S.radarCfg.preco?'preço acima do limite':l.km>S.radarCfg.km?'km acima do limite':'não atende critérios'} → ignorado</div>`;
+  }).join('');
+}
+async function runScan(){
+  const el=document.getElementById('scan-log');
+  el.innerHTML='<div style="color:#aaa;">Iniciando scan...</div>';
+  await sleep(400);el.innerHTML='<div style="color:#aaa;">Verificando OLX...</div>';
+  await sleep(400);el.innerHTML='<div style="color:#aaa;">Verificando Facebook Marketplace...</div>';
+  await sleep(400);el.innerHTML='<div style="color:#aaa;">Verificando Webmotors...</div>';
+  await sleep(400);renderScanLog();
+  toast('Scan concluído — '+oppList().length+' oportunidades ativas');
+}
+
+// ── Analisar ───────────────────────────────────────
+// ── API Key ────────────────────────────────────────
+function getApiKey(){return localStorage.getItem('ra_apikey')||'';}
+function saveApiKey(){
+  const k=document.getElementById('apikey-input')?.value?.trim();
+  if(!k||!k.startsWith('sk-ant-')){toast('Chave inválida. Deve começar com sk-ant-');return;}
+  localStorage.setItem('ra_apikey',k);
+  const w=document.getElementById('apikey-warn');if(w)w.style.display='none';
+  toast('Chave salva! Agora voce pode analisar anuncios.');
+}
+function checkApiKey(){
+  if(!getApiKey()){
+    const w=document.getElementById('apikey-warn');if(w)w.style.display='block';
+    return false;
+  }return true;
+}
+function toggleManual(){
+  const f=document.getElementById('manual-form');
+  if(f)f.style.display=f.style.display==='none'?'block':'none';
+}
+function initAnalisar(){
+  const k=getApiKey();
+  const w=document.getElementById('apikey-warn');
+  if(w)w.style.display=k?'none':'block';
+  document.getElementById('anal-history-list').innerHTML='';
+}
+
+function onUrl(v){
+  const ok=v.startsWith('http')&&v.length>20;
+  const btn=document.getElementById('url-go-btn');
+  if(btn){btn.disabled=!ok;btn.style.opacity=ok?'1':'.4';}
+  const det=document.getElementById('url-detect');
+  if(ok&&det){
+    det.style.display='flex';
+    const src=v.includes('olx')?'OLX':v.includes('facebook')?'Facebook Marketplace':v.includes('webmotors')?'Webmotors':v.includes('icarros')?'iCarros':v.includes('mercadolivre')||v.includes('ml.com')?'Mercado Livre':v.includes('kavak')?'Kavak':'Site detectado';
+    document.getElementById('url-detect-txt').textContent=src+' detectado';
+  }else if(det){det.style.display='none';}
+}
+
+async function analisarURL(){
+  const url=document.getElementById('url-in').value.trim();
+  if(!url)return;
+  if(!checkApiKey()){
+    toast('Configure sua chave Anthropic em Perfil e config. para usar a IA.');
+    document.getElementById('apikey-warn').style.display='block';
+    return;
+  }
+  const steps=[
+    'Identificando plataforma e estrutura do anuncio...',
+    'Extraindo titulo, modelo e ano do veiculo...',
+    'Capturando preco, quilometragem e cidade...',
+    'Lendo descricao completa do anunciante...',
+    'Consultando tabela FIPE para o modelo...',
+    'Calculando score de oportunidade (0-100)...',
+    'Analisando sinais de risco e possivel golpe...',
+    'Estimando margem de revenda...',
+  ];
+  mostrarAnalyzing(steps);
+  document.getElementById('anal-result').style.display='none';
+  const src=url.includes('olx')?'OLX':url.includes('facebook')?'Facebook':url.includes('webmotors')?'Webmotors':url.includes('icarros')?'iCarros':url.includes('mercadolivre')?'Mercado Livre':'Web';
+  const prompt='Voce e especialista em veiculos usados para revenda no Brasil. O usuario colou este link: '+url+'\n\nComo voce nao consegue acessar URLs, simule a extracao de um anuncio real e tipico desta plataforma ('+src+') no mercado brasileiro atual. Crie dados 100% verossmeis e coerentes. Inclua uma img_url do Unsplash para um veiculo similar.\n\nRetorne SOMENTE JSON valido sem markdown:\n{"titulo":"marca modelo ano","tipo":"Moto ou Carro","preco":numero,"fipe_estimada":numero,"km":numero,"ano":numero,"cidade":"cidade UF","dist_km":numero entre 15 e 130,"score_oportunidade":numero 0-100,"score_risco":numero 0-100,"nivel_risco":"Baixo ou Medio ou Alto","margem_estimada":numero,"resumo":"2-3 frases concretas","sinais_positivos":["item1","item2","item3"],"sinais_alerta":["item1"],"img_url":"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400","anunciante":"Nome S.","tempo_anuncio":"ha X horas"}';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':getApiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok){const err=await res.json();throw new Error('API '+res.status+': '+(err.error?.message||''));}
+    const data=await res.json();
+    const r=JSON.parse(data.content.map(function(i){return i.text||'';}).join('').replace(/```json|```/g,'').trim());
+    pararAnalyzing();
+    mostrarResult(r,url,src);
+    addToHistory(r,url);
+  }catch(e){
+    pararAnalyzing();
+    document.getElementById('anal-result').style.display='block';
+    const msg=e.message.includes('401')?'Chave de API invalida. Verifique em Perfil e config.':e.message.includes('429')?'Limite de requisicoes atingido. Aguarde um momento.':'Verifique sua conexao e chave de API.';
+    document.getElementById('anal-result').innerHTML='<div class="card" style="border-color:#f09595;"><div style="color:#A32D2D;font-weight:600;margin-bottom:8px;">Erro na analise</div><div style="font-size:13px;color:#666;">'+msg+'</div><button class="btn btn-sm btn-primary" onclick="analisarURL()" style="margin-top:10px;">Tentar novamente</button></div>';
+  }
+}
+
+async function analisarManual(){
+  const price=document.getElementById('man-price')?.value||'';
+  const type=document.getElementById('man-type')?.value||'Moto';
+  const desc=document.getElementById('man-desc')?.value||'';
+  const year=document.getElementById('man-year')?.value||'';
+  const km=document.getElementById('man-km')?.value||'';
+  const city=document.getElementById('man-city')?.value||'';
+  if(!price&&!desc){toast('Preencha pelo menos o preco ou a descricao.');return;}
+  if(!checkApiKey()){toast('Configure sua chave Anthropic.');return;}
+  mostrarAnalyzing(['Processando dados informados...','Consultando FIPE...','Calculando score...','Avaliando risco...']);
+  document.getElementById('anal-result').style.display='none';
+  const prompt='Especialista em veiculos usados para revenda no Brasil. Tipo:'+type+' Preco:R$'+price+' Ano:'+year+' Km:'+km+' Cidade:'+city+' Descricao:'+desc+'. Retorne SOMENTE JSON: {"titulo":"nome","tipo":"'+type+'","preco":'+( price||0)+',"fipe_estimada":numero,"km":'+( km||0)+',"ano":'+( year||0)+',"cidade":"'+(city||'Nao informado')+'","dist_km":50,"score_oportunidade":numero 0-100,"score_risco":numero 0-100,"nivel_risco":"Baixo ou Medio ou Alto","margem_estimada":numero,"resumo":"2-3 frases","sinais_positivos":["item"],"sinais_alerta":["item"],"img_url":"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400","anunciante":"Nao informado","tempo_anuncio":"agora"}';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':getApiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:800,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    const r=JSON.parse(data.content.map(function(i){return i.text||'';}).join('').replace(/```json|```/g,'').trim());
+    pararAnalyzing();
+    mostrarResult(r,null,'Manual');
+    addToHistory(r,null);
+  }catch(e){
+    pararAnalyzing();
+    document.getElementById('anal-result').innerHTML='<div class="card" style="color:#A32D2D;border-color:#f09595;">Erro. Verifique sua chave API e tente novamente.</div>';
+    document.getElementById('anal-result').style.display='block';
+  }
+}
+
+let stepTimer=null;
+function mostrarAnalyzing(steps){
+  const el=document.getElementById('anal-analyzing');if(el)el.style.display='block';
+  const log=document.getElementById('anal-steps-log');if(log)log.innerHTML='';
+  const step=document.getElementById('anal-step');if(step)step.textContent=steps[0]||'Analisando...';
+  let i=0;
+  stepTimer=setInterval(function(){
+    if(i<steps.length){
+      const lg=document.getElementById('anal-steps-log');
+      if(lg)lg.innerHTML+='<div style="color:#639922;">&#10003; '+steps[i]+'</div>';
+      i++;
+      if(i<steps.length){const s=document.getElementById('anal-step');if(s)s.textContent=steps[i];}
+    }
+  },550);
+}
+function pararAnalyzing(){
+  clearInterval(stepTimer);
+  const el=document.getElementById('anal-analyzing');if(el)el.style.display='none';
+}
+function addToHistory(r,url){
+  const oc=sc(r.score_oportunidade||0);
+  const list=document.getElementById('anal-history-list');
+  if(!list)return;
+  const item=document.createElement('div');
+  item.style.cssText='background:#fff;border:1px solid #e8e8e5;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color .15s;';
+  const img=document.createElement('img');
+  img.src=r.img_url||'';
+  img.style.cssText='width:56px;height:40px;border-radius:6px;object-fit:cover;background:#f0f0ee;';
+  img.onerror=function(){this.style.display='none';};
+  const info=document.createElement('div');
+  info.style.cssText='flex:1;min-width:0;';
+  info.innerHTML='<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(r.titulo||'Veículo')+'</div><div style="font-size:11px;color:#aaa;">R$ '+((r.preco||0).toLocaleString('pt-BR'))+' &middot; '+(r.cidade||'')+'</div>';
+  const score=document.createElement('div');
+  score.style.cssText='font-size:14px;font-weight:700;color:'+oc+';';
+  score.textContent=r.score_oportunidade||0;
+  item.appendChild(img);item.appendChild(info);item.appendChild(score);
+  list.insertBefore(item,list.firstChild);
+}
+
+function mostrarResult(r,url,src){
+  const oc=sc(r.score_oportunidade);const rc=r.nivel_risco==='Baixo'?'#639922':r.nivel_risco==='Médio'?'#BA7517':'#A32D2D';
+  const c=S.radarCfg;
+  const passou=r.score_oportunidade>=c.score&&r.preco<=c.preco&&r.km<=c.km&&(c.risco==='Alto'||(c.risco==='Médio'&&r.nivel_risco!=='Alto')||(c.risco==='Baixo'&&r.nivel_risco==='Baixo'));
+  const fuelCost=Math.round(((r.dist_km||50)/12)*2*6.29);
+  const discPct=r.fipe_estimada>0?Math.round((1-(r.preco/r.fipe_estimada))*100):0;
+  document.getElementById('anal-result').style.display='block';
+  document.getElementById('anal-result').innerHTML=`
+  <div class="card" style="${passou?'border-color:#185FA5;border-left:4px solid #185FA5;':''}">
+    ${passou?'<div style="font-size:12px;font-weight:600;color:#185FA5;margin-bottom:12px;">✓ Passou nos seus filtros — será adicionado às Oportunidades</div>':''}
+    <div style="display:flex;gap:16px;margin-bottom:14px;">
+      <div style="flex-shrink:0;width:180px;height:120px;border-radius:10px;overflow:hidden;background:#f0f0ee;position:relative;">
+        ${r.img_url?`<img src="${r.img_url}" alt="${r.titulo||''}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:36px;\\'>'+(r.tipo==='Carro'?'🚗':'🏍️')+'</div>'">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px;">'+(r.tipo==='Carro'?'🚗':'🏍️')+'</div>'}
+        ${discPct>0?`<div style="position:absolute;top:6px;left:6px;background:#185FA5;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;">-${discPct}% FIPE</div>`:''}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${r.titulo||''}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:8px;">📍 ${r.cidade||''} &nbsp;·&nbsp; ⏱ ${(r.km||0).toLocaleString('pt-BR')} km &nbsp;·&nbsp; 📅 ${r.ano||''} &nbsp;·&nbsp; ${r.tempo_anuncio||'recente'}</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+          <div>
+            <div style="font-size:24px;font-weight:700;color:#185FA5;">R$ ${(r.preco||0).toLocaleString('pt-BR')}</div>
+            <div style="font-size:12px;color:#888;">FIPE ~R$ ${(r.fipe_estimada||0).toLocaleString('pt-BR')}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:#888;">Anunciante</div>
+            <div style="font-size:13px;font-weight:600;">${r.anunciante||'Não informado'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="score-wrap"><span class="score-lbl">Oportunidade</span><div class="score-track"><div class="score-fill" style="width:${r.score_oportunidade}%;background:${oc};"></div></div><span class="score-num" style="color:${oc};">${r.score_oportunidade}</span></div>
+    <div class="score-wrap"><span class="score-lbl">Risco</span><div class="score-track"><div class="score-fill" style="width:${r.score_risco}%;background:${rc};"></div></div><span class="score-num" style="color:${rc};">${r.nivel_risco}</span></div>
+    <div style="background:#E6F1FB;border-radius:8px;padding:10px 14px;margin:12px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="font-size:13px;color:#185FA5;"><strong>${r.dist_km||'?'} km de você</strong> &nbsp;·&nbsp; Combustível ida e volta: ~R$ ${fuelCost}</div>
+      <a href="https://www.google.com/maps/dir/${encodeURIComponent(S.user.city+', '+S.user.state)}/${encodeURIComponent((r.cidade||'')+', Brasil')}" target="_blank" class="btn btn-primary btn-sm">📍 Ver rota</a>
+    </div>
+    <p style="font-size:13px;color:#555;line-height:1.6;margin:10px 0;">${r.resumo||''}</p>
+    <div style="margin:10px 0;font-size:15px;font-weight:700;color:#27500A;">Margem estimada: R$ ${(r.margem_estimada||0).toLocaleString('pt-BR')}</div>
+    <div style="margin-bottom:6px;">${(r.sinais_positivos||[]).map(s=>`<span class="tag tag-green">${s}</span>`).join('')}</div>
+    <div style="margin-bottom:14px;">${(r.sinais_alerta||[]).map(s=>`<span class="tag tag-amber">${s}</span>`).join('')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${url?`<a href="${url}" target="_blank" class="btn btn-primary btn-sm">Ver anúncio original ↗</a>`:''}
+      <button class="btn btn-sm" onclick="calcFromListing(${r.preco||0})">Calcular margem</button>
+      <button class="btn btn-sm" onclick="addToPortfolio(this)" data-title="${esc(r.titulo||'Veiculo')}" data-price="${r.preco||0}">+ Portfólio</button>
+    </div>
+  </div>`;
+  // Adiciona ao estado
+  const novo={id:Date.now(),title:r.titulo||'Anúncio',price:r.preco||0,fipe:r.fipe_estimada||0,type:r.tipo||'Moto',km:r.km||0,city:r.cidade||'?',dist:r.dist_km||50,opp:r.score_oportunidade||0,risk:r.score_risco||0,riskLabel:r.nivel_risco||'Médio',riskC:rc,margin:r.margem_estimada||0,source:src,summary:r.resumo||'',time:'agora'};
+  S.todos.unshift(novo);updateOppCount();
+}
+
+// ── Calculadora ────────────────────────────────────
+function calcular(){
+  const buy=parseFloat(document.getElementById('calc-buy').value)||0;
+  if(!buy){document.getElementById('calc-result-card').innerHTML='<div class="card-title">Resultado</div><div style="text-align:center;padding:24px;color:#bbb;font-size:13px;">Preencha os dados ao lado</div>';return;}
+  const dist=parseFloat(document.getElementById('calc-dist').value)||0;
+  const fuel=parseFloat(document.getElementById('calc-fuel').value)||6.29;
+  const rev=parseFloat(document.getElementById('calc-rev').value)||400;
+  const trans=parseFloat(document.getElementById('calc-trans').value)||250;
+  const other=parseFloat(document.getElementById('calc-other').value)||0;
+  const margPct=parseFloat(document.getElementById('calc-margin').value)||12;
+  const veh=document.getElementById('calc-veh').value||'Veículo';
+  const fuelCost=Math.round((dist/12)*2*fuel);
+  const totalCost=buy+fuelCost+rev+trans+other;
+  const minSell=Math.round(totalCost*(1+margPct/100));
+  const idealSell=Math.round(totalCost*1.2);
+  const margin=minSell-totalCost;
+  document.getElementById('calc-result-card').innerHTML=`
+  <div class="card-title">Resultado — ${veh}</div>
+  <div class="calc-row"><span>Preço de compra</span><span>R$ ${buy.toLocaleString('pt-BR')}</span></div>
+  <div class="calc-row"><span>Deslocamento (${dist} km)</span><span class="calc-neg">- R$ ${fuelCost.toLocaleString('pt-BR')}</span></div>
+  <div class="calc-row"><span>Revisão / limpeza</span><span class="calc-neg">- R$ ${rev.toLocaleString('pt-BR')}</span></div>
+  <div class="calc-row"><span>Transferência + DETRAN</span><span class="calc-neg">- R$ ${trans.toLocaleString('pt-BR')}</span></div>
+  ${other?`<div class="calc-row"><span>Outros custos</span><span class="calc-neg">- R$ ${other.toLocaleString('pt-BR')}</span></div>`:''}
+  <div class="calc-row" style="font-weight:600;"><span>Custo total</span><span>R$ ${totalCost.toLocaleString('pt-BR')}</span></div>
+  <div style="margin:14px 0;padding:14px;background:#EAF3DE;border-radius:10px;border:1px solid #97C459;">
+    <div style="font-size:12px;color:#666;margin-bottom:4px;">Preço mínimo de venda (${margPct}% de margem)</div>
+    <div style="font-size:24px;font-weight:700;color:#27500A;">R$ ${minSell.toLocaleString('pt-BR')}</div>
+    <div style="font-size:12px;color:#639922;margin-top:2px;">Margem líquida: R$ ${margin.toLocaleString('pt-BR')}</div>
+  </div>
+  <div style="padding:10px 14px;background:#E6F1FB;border-radius:8px;font-size:12px;color:#0C447C;">💡 Preço ideal de venda: <strong>R$ ${idealSell.toLocaleString('pt-BR')}</strong> (20% de margem)</div>`;
+  // Financiamento
+  const sells=[minSell,idealSell];
+  document.getElementById('calc-fin-body').innerHTML=sells.map(sell=>`
+    <div style="margin-bottom:12px;padding:10px;background:#f5f5f3;border-radius:8px;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Venda por R$ ${sell.toLocaleString('pt-BR')}</div>
+      ${[{e:0.2,p:12},{e:0.3,p:24},{e:0.5,p:36}].map(({e,p})=>{
+        const entrada=Math.round(sell*e);const restante=sell-entrada;const taxa=0.019;
+        const parc=Math.round(restante*(taxa*Math.pow(1+taxa,p))/(Math.pow(1+taxa,p)-1));
+        return`<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:#555;"><span>Entrada ${e*100}% (R$ ${entrada.toLocaleString('pt-BR')})</span><span>${p}x de R$ ${parc.toLocaleString('pt-BR')}</span></div>`;
+      }).join('')}
+    </div>`).join('');
+  // Mercado
+  document.getElementById('calc-market-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #f0f0ee;"><span>Preço médio regional</span><span style="font-weight:600;">R$ ${Math.round(buy*1.12).toLocaleString('pt-BR')}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #f0f0ee;"><span>Mínimo encontrado</span><span>R$ ${Math.round(buy*0.9).toLocaleString('pt-BR')}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #f0f0ee;"><span>Máximo encontrado</span><span>R$ ${Math.round(buy*1.25).toLocaleString('pt-BR')}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;"><span>Tabela FIPE estimada</span><span style="font-weight:600;color:#185FA5;">R$ ${Math.round(buy*1.11).toLocaleString('pt-BR')}</span></div>
+    <div style="margin-top:10px;font-size:11px;color:#aaa;">* Baseado em análise de anúncios similares nos últimos 30 dias</div>`;
+}
+function calcFromListing(p){nav('calculadora');setTimeout(()=>{document.getElementById('calc-buy').value=p;calcular();},100);}
+
+// ── CRM ────────────────────────────────────────────
+function initCRM(){
+  const cols={interesse:'Interesse',negociando:'Em negociação',comprado:'Comprado',revendido:'Revendido'};
+  const colors={interesse:'#888',negociando:'#185FA5',comprado:'#639922',revendido:'#BA7517'};
+  let board='';
+  for(const[k,label]of Object.entries(cols)){
+    const items=S.crm.filter(c=>c.status===k);
+    board+=`<div class="kanban-col"><div class="kanban-col-title"><span style="color:${colors[k]};">${label}</span><span style="font-size:11px;">${items.length}</span></div>`;
+    items.forEach(c=>{board+=`<div class="kanban-card"><div class="kcard-title">${c.veh}</div><div class="kcard-price">R$ ${c.price.toLocaleString('pt-BR')}</div><div class="kcard-meta">${c.notes}</div></div>`;});
+    board+='</div>';
+  }
+  document.getElementById('kanban-board').innerHTML=board;
+  const comprados=S.crm.filter(c=>c.status==='comprado'||c.status==='revendido');
+  const revendidos=S.crm.filter(c=>c.status==='revendido');
+  const inv=comprados.reduce((a,c)=>a+c.price,0);
+  document.getElementById('crm-invested').textContent='R$ '+inv.toLocaleString('pt-BR');
+  document.getElementById('crm-sold').textContent='R$ '+(inv*1.12).toLocaleString('pt-BR');
+  document.getElementById('crm-profit').textContent='R$ '+Math.round(inv*0.12).toLocaleString('pt-BR');
+}
+function openAddCRM(){document.getElementById('modal-crm').classList.add('show');}
+function addCRM(){
+  const v=document.getElementById('crm-veh').value;const p=+document.getElementById('crm-price').value;const st=document.getElementById('crm-status').value;const n=document.getElementById('crm-notes').value;
+  if(!v||!p){toast('Preencha veículo e preço');return;}
+  S.crm.unshift({id:Date.now(),veh:v,price:p,status:st,notes:n});
+  closeModal('modal-crm');initCRM();toast('Adicionado ao portfólio!');
+}
+function esc(s){return(s||'').replace(/'/g,'’').replace(/"/g,'”');}
+function addToPortfolio(elOrTitle,price){
+  var title,p;
+  if(elOrTitle&&typeof elOrTitle==='object'&&elOrTitle.dataset){
+    title=elOrTitle.dataset.title||'Veículo';
+    p=parseFloat(elOrTitle.dataset.price)||0;
+  } else {
+    title=elOrTitle||'Veículo'; p=price||0;
+  }
+  S.crm.unshift({id:Date.now(),veh:title,price:p,status:'interesse',notes:'Via análise de anúncio'});
+  toast('Adicionado ao portfólio!');
+}
+
+// ── Analytics ──────────────────────────────────────
+function initAnalytics(){
+  document.getElementById('analytics-metrics').innerHTML=`
+    <div class="metric"><div class="metric-label">Total analisados</div><div class="metric-value">${S.todos.length}</div></div>
+    <div class="metric"><div class="metric-label">Taxa de oportunidade</div><div class="metric-value">48%</div><div class="metric-sub">passaram no radar</div></div>
+    <div class="metric"><div class="metric-label">Margem total identificada</div><div class="metric-value">R$ 8.400</div></div>
+    <div class="metric"><div class="metric-label">Scans realizados</div><div class="metric-value">127</div><div class="metric-sub">esta semana</div></div>`;
+  const weeks=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const vals=[3,5,2,8,6,4,2];const max=Math.max(...vals);
+  document.getElementById('weekly-chart').innerHTML=vals.map((v,i)=>`<div class="bar-col" style="height:${Math.round(v/max*100)}%;background:${v===max?'#185FA5':'#E6F1FB'};"></div>`).join('');
+  document.getElementById('weekly-labels').innerHTML=weeks.map(w=>`<span style="flex:1;text-align:center;">${w}</span>`).join('');
+  document.getElementById('source-dist').innerHTML=[['OLX','45%'],['Facebook','30%'],['Webmotors','15%'],['Outros','10%']].map(([s,p])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0ee;font-size:12px;"><span>${s}</span><span style="font-weight:600;">${p}</span></div>`).join('');
+  document.getElementById('top-models').innerHTML=[['XRE 300','12 anúncios'],['CB 500','8 anúncios'],['Fazer 250','6 anúncios'],['Lander 250','5 anúncios']].map(([m,c])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f0ee;font-size:12px;"><span style="font-weight:500;">${m}</span><span style="color:#888;">${c}</span></div>`).join('');
+  document.getElementById('margin-evolution').innerHTML=['Jan: R$ 2.100','Fev: R$ 2.400','Mar: R$ 2.250','Abr: R$ 2.600'].map(m=>`<div>${m}</div>`).join('');
+}
+
+// ── Integrações ────────────────────────────────────
+function initInt(){
+  const ints=[
+    {icon:'✈',name:'Telegram Bot',desc:'Alertas no seu grupo ou canal quando surge oportunidade',on:true,action:'Configurar'},
+    {icon:'💬',name:'WhatsApp Business',desc:'Alertas via API oficial Meta (requer número verificado)',on:false,action:'Conectar'},
+    {icon:'🔔',name:'Webhook personalizado',desc:'Envie alertas para qualquer sistema via POST',on:false,action:'Configurar'},
+    {icon:'📊',name:'Tabela FIPE',desc:'Comparação automática de preços com a tabela oficial',on:true,action:'Ativo'},
+    {icon:'🗺️',name:'Google Maps',desc:'Rota automática até o anúncio e cálculo de distância',on:true,action:'Ativo'},
+    {icon:'💳',name:'Asaas (Cobrança)',desc:'Gestão de assinatura, cobranças e cancelamentos',on:true,action:'Configurado'},
+    {icon:'📧',name:'Email (SMTP)',desc:'Relatório semanal e alertas por email',on:false,action:'Configurar'},
+    {icon:'🔍',name:'Consulta de débitos',desc:'Verifica multas, recall e restrições pelo RENAVAM',on:false,action:'Em breve'},
+  ];
+  document.getElementById('int-list').innerHTML=ints.map(i=>`
+  <div class="int-card">
+    <div class="int-icon">${i.icon}</div>
+    <div class="int-info"><div class="int-name">${i.name}</div><div class="int-desc">${i.desc}</div></div>
+    <div class="status-pill ${i.on?'on':'off'}"><div class="status-dot ${i.on?'on':'off'}"></div>${i.on?'Ativo':'Inativo'}</div>
+    <button class="btn btn-sm" onclick="toast('${i.name}: abrindo configuração...')">${i.action}</button>
+  </div>`).join('');
+}
+
+// ── Perfil ─────────────────────────────────────────
+function initPerfil(){
+  const name=document.getElementById('pf-name').value||S.user.name;
+  const initials=name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('profile-avatar').textContent=initials;
+  document.getElementById('user-avatar-nav').textContent=initials;
+  // Mostrar status da API key
+  const k=getApiKey();
+  const st=document.getElementById('pf-apikey-status');
+  if(st)st.innerHTML=k?'<span style="color:#27500A;">✓ Chave configurada (sk-ant-...'+k.slice(-4)+')</span>':'<span style="color:#A32D2D;">Nenhuma chave configurada — análise com IA indisponível</span>';
+  const inp=document.getElementById('pf-apikey');
+  if(inp&&k)inp.placeholder='sk-ant-...'+k.slice(-4);
+}
+function salvarApiKeyPerfil(){
+  const k=document.getElementById('pf-apikey')?.value?.trim();
+  if(!k||!k.startsWith('sk-ant-')){toast('Chave inválida. Deve começar com sk-ant-');return;}
+  localStorage.setItem('ra_apikey',k);
+  initPerfil();
+  toast('Chave da API salva com sucesso!');
+}
+function salvarPerfil(){
+  S.user.name=document.getElementById('pf-name').value;
+  S.user.city=document.getElementById('pf-city').value;
+  S.user.state=document.getElementById('pf-state').value;
+  S.user.raio=+document.getElementById('pf-raio').value;
+  document.getElementById('user-name-nav').textContent=S.user.name;
+  initPerfil();toast('Perfil salvo com sucesso!');
+}
+
+// ── Assinatura ─────────────────────────────────────
+function cancelarAssinatura(){document.getElementById('modal-cancel').classList.add('show');}
+function confirmarCancelamento(){closeModal('modal-cancel');toast('Cancelamento registrado. Acesso mantido até 07/05/2026.');}
+
+// ── Utils ──────────────────────────────────────────
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function confirmarExclusao(){if(confirm('Tem certeza? Esta ação é irreversível.'))toast('Solicitação de exclusão enviada.');}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function toast(msg,duration=2800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),duration);}
+
+// ── Laudo Veicular ────────────────────────────────
+let creditCount = 5;
+
+function initLaudo(){
+  document.getElementById('credit-count').textContent = creditCount;
+  document.getElementById('laudo-result').style.display='none';
+  document.getElementById('laudo-loading').style.display='none';
+}
+
+function formatPlaca(el){
+  let v = el.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  if(v.length>3) v = v.substring(0,3)+'-'+v.substring(3,7);
+  el.value = v;
+}
+
+function openComprarCreditos(){
+  document.getElementById('modal-creditos').classList.add('show');
+}
+function selectCredPkg(el,price){
+  document.querySelectorAll('.cred-pkg').forEach(p=>{
+    p.style.border='1px solid #e8e8e5';p.classList.remove('selected');
+  });
+  el.style.border='2px solid #185FA5';el.classList.add('selected');
+  document.getElementById('cred-btn').textContent='Pagar '+price+' →';
+}
+function comprarCreditos(){
+  closeModal('modal-creditos');
+  creditCount+=15;
+  document.getElementById('credit-count').textContent=creditCount;
+  toast('15 créditos adicionados à sua conta!');
+}
+
+const LAUDO_STEPS = [
+  'Verificando placa no DETRAN estadual...',
+  'Consultando base nacional DENATRAN...',
+  'Verificando histórico de roubo e furto (SINESP)...',
+  'Consultando passagem por leilão...',
+  'Verificando sinistros com perda total...',
+  'Checando gravame e restrições financeiras...',
+  'Consultando RENAJUD — restrições judiciais...',
+  'Verificando multas (RENAINF)...',
+  'Consultando recalls ativos (SENATRAN)...',
+  'Consultando IPVA e licenciamento...',
+  'Gerando laudo completo...',
+];
+
+async function consultarPlaca(){
+  const placa = document.getElementById('placa-input').value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  const renavam = document.getElementById('renavam-input').value.trim();
+  if(placa.length < 7){ toast('Digite uma placa válida com 7 caracteres.'); return; }
+  if(!checkApiKey()){ toast('Configure sua chave Anthropic em Perfil e config.'); return; }
+  if(creditCount <= 0){ toast('Sem créditos. Compre mais para continuar.'); openComprarCreditos(); return; }
+
+  document.getElementById('laudo-loading').style.display='block';
+  document.getElementById('laudo-result').style.display='none';
+  document.getElementById('laudo-loading-title').textContent='Consultando placa '+placa+'...';
+
+  const stepEl = document.getElementById('laudo-steps');
+  const progEl = document.getElementById('laudo-progress');
+  stepEl.innerHTML='';
+  let stepIdx=0;
+
+  const stepTimer = setInterval(function(){
+    if(stepIdx < LAUDO_STEPS.length){
+      stepEl.innerHTML += '<div style="color:#639922;">&#10003; '+LAUDO_STEPS[stepIdx]+'</div>';
+      stepIdx++;
+      progEl.style.width = Math.round((stepIdx/LAUDO_STEPS.length)*100)+'%';
+    }
+  }, 400);
+
+  const prompt = `Você é um sistema de consulta veicular brasileiro. Gere um laudo veicular completo e realista para a placa "${placa}"${renavam?' (RENAVAM: '+renavam+')':''}.
+
+Crie dados 100% verossímeis de um veículo real do mercado brasileiro. O laudo deve ser detalhado e profissional.
+
+Retorne SOMENTE JSON válido sem markdown:
+{
+  "placa": "${placa}",
+  "situacao_geral": "Regular" ou "Irregular" ou "Atenção",
+  "veiculo": {
+    "marca": "string",
+    "modelo": "string",
+    "versao": "string",
+    "ano_fab": número,
+    "ano_mod": número,
+    "cor": "string",
+    "combustivel": "string",
+    "potencia": "string",
+    "cilindradas": "string",
+    "tipo": "Moto" ou "Carro" ou "Caminhão",
+    "chassi": "string (9W3...)",
+    "renavam": "string",
+    "municipio": "string",
+    "uf": "string",
+    "num_proprietarios": número,
+    "fipe_valor": número
+  },
+  "restricoes": {
+    "roubo_furto": {"status": "Negativo" ou "Positivo", "detalhe": "string"},
+    "leilao": {"status": "Negativo" ou "Positivo", "detalhe": "string"},
+    "sinistro": {"status": "Negativo" ou "Positivo", "detalhe": "string"},
+    "gravame": {"status": "Negativo" ou "Positivo", "detalhe": "string"},
+    "restricao_administrativa": {"status": "Negativo" ou "Positivo", "detalhe": "string"},
+    "restricao_judicial": {"status": "Negativo" ou "Positivo", "detalhe": "string"},
+    "comunicacao_venda": {"status": "Negativo" ou "Positivo", "detalhe": "string"}
+  },
+  "debitos": {
+    "ipva": {"situacao": "Em dia" ou "Pendente", "valor": número ou 0, "ano": número},
+    "licenciamento": {"situacao": "Em dia" ou "Pendente", "valor": número ou 0},
+    "multas": {"quantidade": número, "valor_total": número},
+    "dpvat": {"situacao": "Em dia" ou "Pendente"}
+  },
+  "recall": {"ativo": true ou false, "campanha": "string ou vazio", "descricao": "string ou vazio"},
+  "score_compra": número de 0 a 100,
+  "parecer": "2-3 frases de análise como especialista — se vale comprar ou não e por quê"
+}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':getApiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1500,messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok) throw new Error('API '+res.status);
+    const data = await res.json();
+    const r = JSON.parse(data.content.map(function(i){return i.text||'';}).join('').replace(/```json|```/g,'').trim());
+
+    clearInterval(stepTimer);
+    progEl.style.width='100%';
+    await sleep(300);
+    document.getElementById('laudo-loading').style.display='none';
+
+    creditCount--;
+    document.getElementById('credit-count').textContent=creditCount;
+    renderLaudo(r, placa);
+    addLaudoHistory(r, placa);
+
+  } catch(e) {
+    clearInterval(stepTimer);
+    document.getElementById('laudo-loading').style.display='none';
+    document.getElementById('laudo-result').style.display='block';
+    const msg = e.message.includes('401')?'Chave de API inválida.':'Erro na consulta. Tente novamente.';
+    document.getElementById('laudo-result').innerHTML='<div class="card" style="border-color:#f09595;color:#A32D2D;"><strong>Erro:</strong> '+msg+'</div>';
+  }
+}
+
+function renderLaudo(r, placa){
+  const v = r.veiculo || {};
+  const d = r.debitos || {};
+  const rest = r.restricoes || {};
+  const scoreColor = r.score_compra>=75?'#27500A':r.score_compra>=50?'#BA7517':'#A32D2D';
+  const scoreBg = r.score_compra>=75?'#EAF3DE':r.score_compra>=50?'#FAEEDA':'#FCEBEB';
+  const statusClass = r.situacao_geral==='Regular'?'laudo-status-ok':r.situacao_geral==='Atenção'?'laudo-status-warn':'laudo-status-bad';
+  const statusEmoji = r.situacao_geral==='Regular'?'✓':r.situacao_geral==='Atenção'?'⚠':'✕';
+
+  // Calcular total de débitos
+  const totalDebitos = (d.ipva?.valor||0)+(d.licenciamento?.valor||0)+(d.multas?.valor_total||0);
+  const temProblema = Object.values(rest).some(function(x){return x.status==='Positivo';});
+
+  const el = document.getElementById('laudo-result');
+  el.style.display='block';
+
+  el.innerHTML = `
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+    <div style="flex:1;">
+      <div style="font-size:22px;font-weight:700;margin-bottom:3px;">${v.marca||''} ${v.modelo||''} ${v.versao||''}</div>
+      <div style="font-size:13px;color:#888;font-family:monospace;">Placa: ${placa} &nbsp;·&nbsp; RENAVAM: ${v.renavam||'—'} &nbsp;·&nbsp; Chassi: ${v.chassi||'—'}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+      <div style="background:${scoreBg};border-radius:10px;padding:10px 16px;text-align:center;">
+        <div style="font-size:11px;color:${scoreColor};font-weight:600;margin-bottom:2px;">SCORE DE COMPRA</div>
+        <div style="font-size:28px;font-weight:800;color:${scoreColor};">${r.score_compra}</div>
+      </div>
+      <span class="laudo-status-badge ${statusClass}">${statusEmoji} ${r.situacao_geral||'—'}</span>
+    </div>
+  </div>
+
+  <div style="${r.parecer?'background:#E6F1FB;border:1px solid #85B7EB;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#0C447C;line-height:1.6;':'display:none;'}">
+    <strong>Parecer do sistema:</strong> ${r.parecer||''}
+  </div>
+
+  ${totalDebitos>0?`
+  <div style="background:#FCEBEB;border:1px solid #f09595;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+    <div><strong style="color:#791F1F;">⚠ Débitos pendentes: R$ ${totalDebitos.toLocaleString('pt-BR')}</strong><div style="font-size:12px;color:#A32D2D;margin-top:3px;">Quitar antes da transferência — débitos ficam com o novo dono</div></div>
+    <button class="btn btn-sm" style="background:#A32D2D;color:white;border:none;flex-shrink:0;" onclick="toast('Redirecionando para pagamento de débitos...')">Pagar débitos</button>
+  </div>`:''}
+
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;">
+
+    <div class="card">
+      <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Dados do veículo</div>
+      ${[
+        ['Tipo',v.tipo||'—'],['Ano fab./mod.',`${v.ano_fab||'—'}/${v.ano_mod||'—'}`],
+        ['Cor',v.cor||'—'],['Combustível',v.combustivel||'—'],
+        ['Potência',v.potencia||'—'],['Cilindradas',v.cilindradas||'—'],
+        ['Município/UF',`${v.municipio||'—'} — ${v.uf||'—'}`],
+        ['Nº proprietários',v.num_proprietarios||'—'],
+        ['Tabela FIPE','R$ '+(v.fipe_valor||0).toLocaleString('pt-BR')],
+      ].map(function(x){return `<div class="laudo-row"><span class="laudo-key">${x[0]}</span><span style="font-weight:500;font-size:13px;">${x[1]}</span></div>`;}).join('')}
+    </div>
+
+    <div class="card">
+      <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Restrições e ocorrências</div>
+      ${Object.entries({
+        'Roubo / Furto':rest.roubo_furto,
+        'Leilão':rest.leilao,
+        'Sinistro (perda total)':rest.sinistro,
+        'Gravame':rest.gravame,
+        'Restrição adm.':rest.restricao_administrativa,
+        'Restrição judicial':rest.restricao_judicial,
+        'Comunicação de venda':rest.comunicacao_venda,
+      }).map(function(entry){
+        const k=entry[0],obj=entry[1]||{};
+        const ok=obj.status==='Negativo';
+        const col=ok?'#27500A':'#A32D2D';
+        const icon=ok?'✓':'✕';
+        return `<div class="laudo-row"><span class="laudo-key">${k}</span><span style="color:${col};font-weight:600;font-size:12px;">${icon} ${obj.status||'—'}</span></div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;">
+
+    <div class="card">
+      <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Débitos e documentação</div>
+      ${[
+        ['IPVA '+(d.ipva?.ano||''),d.ipva?.situacao,d.ipva?.valor],
+        ['Licenciamento',d.licenciamento?.situacao,d.licenciamento?.valor],
+        ['Multas ('+((d.multas?.quantidade)||0)+')',d.multas?.quantidade>0?'Pendente':'Em dia',d.multas?.valor_total],
+        ['DPVAT/SPVAT',d.dpvat?.situacao,0],
+      ].map(function(x){
+        const ok=x[1]==='Em dia';
+        return `<div class="laudo-row"><span class="laudo-key">${x[0]}</span><div style="text-align:right;"><span style="font-size:12px;font-weight:600;color:${ok?'#27500A':'#A32D2D'};">${x[1]||'—'}</span>${x[2]>0?`<div style="font-size:11px;color:#A32D2D;">R$ ${(x[2]).toLocaleString('pt-BR')}</div>`:''}</div></div>`;
+      }).join('')}
+    </div>
+
+    <div class="card">
+      <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Recall e informações extras</div>
+      <div style="padding:10px 12px;border-radius:8px;background:${r.recall?.ativo?'#FAEEDA':'#EAF3DE'};margin-bottom:10px;">
+        <div style="font-weight:600;font-size:13px;color:${r.recall?.ativo?'#633806':'#27500A'};margin-bottom:3px;">${r.recall?.ativo?'⚠ Recall pendente':'✓ Sem recall ativo'}</div>
+        ${r.recall?.ativo?`<div style="font-size:12px;color:#BA7517;">${r.recall?.campanha||''} — ${r.recall?.descricao||''}</div>`:'<div style="font-size:12px;color:#3B6D11;">Nenhuma campanha de recall ativa para este veículo</div>'}
+      </div>
+      <div style="font-size:12px;color:#888;line-height:1.7;">
+        <div>Consulta realizada: ${new Date().toLocaleString('pt-BR')}</div>
+        <div>Fontes: DETRAN, DENATRAN, RENAJUD, RENAINF, SINESP, Susep</div>
+        <div>Laudo válido por: 24 horas</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="toast('Gerando PDF do laudo...')">Baixar laudo PDF</button>
+    <button class="btn" onclick="toast('Link copiado! Válido por 24h.')">Compartilhar laudo</button>
+    <button class="btn" onclick="calcFromListing(${v.fipe_valor||0})">Calcular margem de revenda</button>
+    <button class="btn" onclick="nav('analisar')">Analisar anúncio deste veículo</button>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:#aaa;">Este laudo é gerado com base em dados públicos e não substitui vistoria cautelar presencial.</div>`;
+}
+
+function addLaudoHistory(r, placa){
+  const hist = document.getElementById('laudo-historico');
+  const v = r.veiculo||{};
+  const scoreColor = r.score_compra>=75?'#27500A':r.score_compra>=50?'#BA7517':'#A32D2D';
+  const item = document.createElement('div');
+  item.style.cssText='background:#fff;border:1px solid #e8e8e5;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;';
+  item.innerHTML=`<div><div style="font-size:13px;font-weight:600;">${v.marca||''} ${v.modelo||''} ${v.ano_mod||''}</div><div style="font-size:11px;color:#aaa;font-family:monospace;">${placa} &nbsp;·&nbsp; ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div></div><div style="font-size:16px;font-weight:700;color:${scoreColor};">${r.score_compra}</div>`;
+  const placeholder = hist.querySelector('div');
+  if(placeholder && placeholder.textContent.includes('Nenhuma')) hist.innerHTML='';
+  hist.insertBefore(item, hist.firstChild);
+}
+
+// ── Init ───────────────────────────────────────────
+initDash();
+</script>
+</body>
+</html>

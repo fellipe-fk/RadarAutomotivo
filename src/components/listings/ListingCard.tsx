@@ -34,6 +34,9 @@ export default function ListingCard({ listing, onFavorite, onDiscard, compact }:
   const riskColorValue = riskColor(listing.riskLevel)
   const riskLabelValue = riskLabel(listing.riskLevel)
   const riskScore = listing.riskScore ?? 0
+  const distanceKm = typeof listing.distanceKm === 'number' ? listing.distanceKm : null
+  const mileage = typeof listing.mileage === 'number' ? listing.mileage : null
+  const estimatedMargin = typeof listing.estimatedMargin === 'number' ? listing.estimatedMargin : null
   const fipeDiscount =
     listing.fipePrice && listing.fipePrice > listing.price
       ? Math.round((1 - listing.price / listing.fipePrice) * 100)
@@ -78,8 +81,8 @@ export default function ListingCard({ listing, onFavorite, onDiscard, compact }:
 
           <div className="listing-card__meta">
             {listing.city ? <span>Cidade: {listing.city}</span> : null}
-            {listing.distanceKm !== undefined ? <span>Dist.: {listing.distanceKm} km</span> : null}
-            {listing.mileage !== undefined ? <span>Km: {listing.mileage.toLocaleString('pt-BR')}</span> : null}
+            {distanceKm !== null ? <span>Dist.: {distanceKm} km</span> : null}
+            {mileage !== null ? <span>Km: {mileage.toLocaleString('pt-BR')}</span> : null}
             {listing.year ? <span>Ano: {listing.year}</span> : null}
           </div>
 
@@ -108,8 +111,8 @@ export default function ListingCard({ listing, onFavorite, onDiscard, compact }:
       <div className="listing-card__bottom">
         <div className="listing-card__summary">
           {listing.aiSummary || 'Sem resumo de IA disponivel para este anuncio ainda.'}
-          {listing.estimatedMargin !== undefined ? (
-            <span className="listing-card__margin"> Margem est.: R$ {listing.estimatedMargin.toLocaleString('pt-BR')}</span>
+          {estimatedMargin !== null ? (
+            <span className="listing-card__margin"> Margem est.: R$ {estimatedMargin.toLocaleString('pt-BR')}</span>
           ) : null}
         </div>
 

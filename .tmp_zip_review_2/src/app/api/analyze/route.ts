@@ -4,8 +4,8 @@ import { buildAlertMessage } from '@/lib/analyzer'
 import { requireAuth } from '@/lib/auth'
 import { analysisRiskMap, parseEstimatedMarginValue, runAnalysisWithFallback } from '@/lib/listing-analysis'
 import { extractListingFromUrl, NotAVehicleError } from '@/lib/listing-extractor'
-import { prisma } from '@/lib/prisma'
 import { matchesRadar } from '@/lib/radar'
+import { prisma } from '@/lib/prisma'
 import { sendTelegramAlert } from '@/lib/telegram'
 
 function parseNumberish(value: unknown) {
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       try {
         extracted = await extractListingFromUrl(cleanSourceUrl)
       } catch (error) {
+        // Erro de conteúdo que não é veículo — retornar imediatamente, não fazer fallback manual
         if (error instanceof NotAVehicleError) {
           return NextResponse.json(
             {
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        // Para outros erros de extração: só lança se não tiver dados manuais
         if (!manualTitle && !manualDescription && !parseNumberish(price)) {
           throw error
         }
@@ -143,11 +145,13 @@ export async function POST(req: NextRequest) {
     })
 
     const config = await prisma.radarConfig.findUnique({ where: { userId: user.id } })
+
+    // Usa a mesma função matchesRadar do scan para garantir regra unificada
     const shouldAlert =
       config &&
       !updated.alertSent &&
       matchesRadar(updated, config) &&
-      user.telegramEnabled &&
+      user.telegramEnabled &&        // respeita o flag do usuário
       !!user.telegramChatId
 
     if (shouldAlert) {

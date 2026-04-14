@@ -18,6 +18,8 @@ type SystemStatus = {
   asaasConfigured: boolean
   emailConfigured: boolean
   mapsConfigured: boolean
+  laudoConfigured: boolean
+  laudoProviderName: string
 }
 
 export default function IntegracoesPage() {
@@ -90,12 +92,22 @@ export default function IntegracoesPage() {
         on: !!system?.emailConfigured && !!user?.emailAlertas,
         action: system?.emailConfigured ? 'Configurar' : 'Em breve',
       },
-      { icon: 'DV', name: 'Consulta de debitos', description: 'Consulta multas, recall e restricoes pelo RENAVAM.', on: false, action: 'Em breve' },
+      {
+        icon: 'DV',
+        name: 'Consulta de debitos',
+        description: system?.laudoConfigured
+          ? `Laudo veicular ligado a ${system.laudoProviderName}.`
+          : 'Consulta multas, recall e restricoes pelo RENAVAM.',
+        on: !!system?.laudoConfigured,
+        action: system?.laudoConfigured ? 'Servidor' : 'Configurar',
+      },
     ],
     [
       system?.asaasConfigured,
       system?.emailConfigured,
       system?.fipeConfigured,
+      system?.laudoConfigured,
+      system?.laudoProviderName,
       system?.mapsConfigured,
       system?.telegramConfigured,
       system?.whatsappConfigured,

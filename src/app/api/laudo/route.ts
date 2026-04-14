@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ZodError, z } from 'zod'
 
 import { auditLog, requireAuth } from '@/lib/auth'
-import { gerarLaudo, normalizarPlaca } from '@/lib/laudo'
+import { consultarLaudoVeicular, normalizarPlaca } from '@/lib/laudo'
 import { prisma } from '@/lib/prisma'
 
 const createLaudoSchema = z.object({
@@ -24,6 +24,24 @@ function normalizeOptional(value?: string) {
 
 function isAuthError(error: unknown) {
   return error instanceof Error && /(autenticado|token|sessao|assinatura)/i.test(error.message)
+}
+
+function canBypassLaudoCreditsForLocalDev(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return false
+  }
+
+  const hosts = [request.headers.get('host'), request.headers.get('x-forwarded-host')]
+    .filter(Boolean)
+    .map((value) => value!.toLowerCase())
+
+  return hosts.some(
+    (host) =>
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.startsWith('localhost:') ||
+      host.startsWith('127.0.0.1:')
+  )
 }
 
 export async function GET(request: NextRequest) {
@@ -60,6 +78,7 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request)
     const body = await request.json()
     const data = createLaudoSchema.parse(body)
+    const allowDevCreditBypass = canBypassLaudoCreditsForLocalDev(request)
 
     const plate = normalizarPlaca(data.plate)
 
@@ -68,21 +87,23 @@ export async function POST(request: NextRequest) {
     }
 
     const renavam = normalizeOptional(data.renavam)
-    const resultado = gerarLaudo(plate, renavam)
+    const resultado = await consultarLaudoVeicular(plate, renavam)
 
     const transactionResult = await prisma.$transaction(async (tx) => {
-      const creditUpdate = await tx.user.updateMany({
-        where: {
-          id: user.id,
-          creditosLaudo: { gt: 0 },
-        },
-        data: {
-          creditosLaudo: { decrement: 1 },
-        },
-      })
+      if (!allowDevCreditBypass) {
+        const creditUpdate = await tx.user.updateMany({
+          where: {
+            id: user.id,
+            creditosLaudo: { gt: 0 },
+          },
+          data: {
+            creditosLaudo: { decrement: 1 },
+          },
+        })
 
-      if (creditUpdate.count === 0) {
-        throw new Error('SEM_CREDITOS')
+        if (creditUpdate.count === 0) {
+          throw new Error('SEM_CREDITOS')
+        }
       }
 
       const laudo = await tx.laudo.create({
@@ -93,7 +114,7 @@ export async function POST(request: NextRequest) {
           resultado: resultado as Prisma.InputJsonValue,
           scoreCompra: resultado.score_compra,
           situacao: resultado.situacao_geral,
-          valorCobrado: 19,
+          valorCobrado: allowDevCreditBypass ? 0 : 19,
         },
         select: {
           id: true,
@@ -112,6 +133,7 @@ export async function POST(request: NextRequest) {
 
       return {
         laudo,
+        creditBypass: allowDevCreditBypass,
         remainingCredits: updatedUser.creditosLaudo,
       }
     })
@@ -120,6 +142,7 @@ export async function POST(request: NextRequest) {
       placa: plate,
       scoreCompra: resultado.score_compra,
       situacao: resultado.situacao_geral,
+      origem: resultado.origem,
     })
 
     return NextResponse.json(transactionResult, { status: 201 })
@@ -148,6 +171,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.error('Erro ao gerar laudo:', error)
-    return NextResponse.json({ error: 'Erro ao gerar laudo' }, { status: 500 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Erro ao gerar laudo' },
+      { status: 500 }
+    )
   }
 }

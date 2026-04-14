@@ -232,7 +232,8 @@ export async function getUserFromAccessToken(token: string) {
 export async function requireAuth(request: NextRequest) {
   const bearerToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
   const cookieToken = request.cookies.get('ra_token')?.value
-  const token = bearerToken || cookieToken
+  const serverCookieToken = cookies().get('ra_token')?.value
+  const token = bearerToken || cookieToken || serverCookieToken
 
   if (!token) {
     throw new Error('Não autenticado')

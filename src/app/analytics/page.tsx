@@ -42,16 +42,18 @@ export default function AnalyticsPage() {
       setLoading(true)
 
       try {
-        const [listingsResponse, alertsResponse] = await Promise.all([
+        const [listingsResponse, alertsResponse, systemResponse] = await Promise.all([
           fetch('/api/listings?status=ANALYZED'),
           fetch('/api/alerts'),
+          fetch('/api/system/status'),
         ])
 
         const listingsData = await listingsResponse.json()
         const alertsData = await alertsResponse.json()
+        const systemData = await systemResponse.json()
 
         setListings(listingsData.listings || [])
-        setConfig(alertsData.config || null)
+        setConfig(alertsData.config || { ativo: systemData?.radarEnabled ?? true, scoreAlerta: 75, riscoMax: 'MEDIUM' })
       } catch (error) {
         console.error(error)
         setListings([])

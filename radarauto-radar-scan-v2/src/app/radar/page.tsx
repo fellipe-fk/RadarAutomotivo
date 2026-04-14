@@ -8,13 +8,8 @@ import { Listing } from '@/types'
 
 const sourceOptions = [
   { value: 'olx', label: 'OLX' },
-  { value: 'olxpro', label: 'OLX Pro' },
   { value: 'facebook', label: 'Facebook' },
   { value: 'webmotors', label: 'Webmotors' },
-  { value: 'icarros', label: 'iCarros' },
-  { value: 'mercadolivre', label: 'Mercado Livre' },
-  { value: 'kavak', label: 'Kavak' },
-  { value: 'queroquero', label: 'Quero-Quero' },
   { value: 'manual', label: 'Manual' },
 ]
 
@@ -41,6 +36,7 @@ export default function RadarPage() {
   const [config, setConfig] = useState<typeof DEFAULT_RADAR_CONFIG>(DEFAULT_RADAR_CONFIG)
   const [listings, setListings] = useState<Listing[]>([])
   const [newModel, setNewModel] = useState('')
+  const [newSeedUrl, setNewSeedUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [runningScan, setRunningScan] = useState(false)
@@ -75,25 +71,27 @@ export default function RadarPage() {
   const radarListings = useMemo(() => listings.filter((listing) => matchesRadar(listing, config)), [config, listings])
   const latestScanAt = useMemo(() => listings[0]?.createdAt, [listings])
 
+  const [scanItems, setScanItems] = useState<Array<{url: string; title?: string; status: string; detail: string; listingId?: string}>>([])
+
   const scanLog = useMemo(() => {
+    // Priorizar itens do último scan se disponíveis
+    if (scanItems.length > 0) {
+      return scanItems.slice(0, 12).map((item, i) => ({
+        id: item.listingId || `scan-${i}`,
+        className: `scan-log__line scan-log__line--${item.status === 'skipped' ? 'skip' : 'ok'}`,
+        text: `${item.title || item.url} | ${item.detail}`,
+      }))
+    }
+    // Fallback: histórico do banco
     return listings.slice(0, 8).map((listing) => {
       const passed = matchesRadar(listing, config)
-
-      if (passed) {
-        return {
-          id: listing.id,
-          className: 'scan-log__line scan-log__line--ok',
-          text: `${listing.title} | score ${safeNumber(listing.opportunityScore)} | entrou em oportunidades`,
-        }
-      }
-
       return {
         id: listing.id,
-        className: 'scan-log__line scan-log__line--skip',
-        text: `${listing.title} | nao atende aos filtros atuais`,
+        className: `scan-log__line scan-log__line--${passed ? 'ok' : 'skip'}`,
+        text: `${listing.title} | score ${safeNumber(listing.opportunityScore)} | ${passed ? 'passou no radar' : 'nao atende filtros'}`,
       }
     })
-  }, [config, listings])
+  }, [config, listings, scanItems])
 
   function updateConfigField(field: keyof typeof DEFAULT_RADAR_CONFIG, value: string | number | boolean | string[]) {
     setConfig((current) => ({
@@ -118,6 +116,19 @@ export default function RadarPage() {
 
   function removeModel(model: string) {
     updateConfigField('modelos', config.modelos.filter((item) => item !== model))
+  }
+
+  function addSeedUrl() {
+    const value = newSeedUrl.trim()
+
+    if (!value || config.seedUrls.includes(value)) return
+
+    updateConfigField('seedUrls', [...config.seedUrls, value])
+    setNewSeedUrl('')
+  }
+
+  function removeSeedUrl(url: string) {
+    updateConfigField('seedUrls', config.seedUrls.filter((item) => item !== url))
   }
 
   async function saveConfig(nextConfig = config) {
@@ -168,11 +179,12 @@ export default function RadarPage() {
         throw new Error(data.error || 'Falha ao rodar o scan real.')
       }
 
+      setScanItems(data.items || [])
       await fetchRadarData()
-      const modeLabel =
-        data.summary?.mode === 'search' ? 'busca automática' : data.summary?.mode === 'mixed' ? 'busca + URLs' : 'URLs manuais'
+      const s = data.summary
+      const modeLabel = s.mode === 'search' ? 'busca automática' : s.mode === 'urls' ? 'URLs manuais' : 'busca + URLs'
       setFeedback(
-        `Scan real concluido via ${modeLabel}: ${data.summary.analyzed} analisados, ${data.summary.created} novos, ${data.summary.updated} atualizados e ${data.summary.alerted} alertas enviados.`
+        `Scan concluído via ${modeLabel}: ${s.analyzed} analisados, ${s.created} novos, ${s.alerted} alertas disparados, ${s.skipped} ignorados.`
       )
     } catch (error) {
       console.error(error)
@@ -201,14 +213,15 @@ export default function RadarPage() {
         <div className={`radar-status ${config.ativo ? 'on' : 'off'}`}>
           <div className={`rdot ${config.ativo ? 'on' : 'off'}`} />
           <div>
-            <strong>{config.ativo ? 'Radar ativo' : 'Radar pausado'}</strong> - {config.modelos.length} modelos
-            monitorados - {config.fontes.length} fontes - ultimo scan {formatRelativeTime(latestScanAt)} -{' '}
-            <strong>{radarListings.length} oportunidades</strong> ativas
-            {config.ativo ? (
-              <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.75 }}>
-                (scan a cada {config.frequenciaMin >= 60 ? `${config.frequenciaMin / 60}h` : `${config.frequenciaMin}min`})
+            <strong>{config.ativo ? 'Radar ativo — buscando automaticamente' : 'Radar pausado'}</strong>
+            {' '}- {config.modelos.length} modelo(s) - {config.fontes.length} fonte(s)
+            {' '}- último scan {formatRelativeTime(latestScanAt)}
+            {' '}- <strong>{radarListings.length} oportunidade(s)</strong> ativas
+            {config.ativo && (
+              <span style={{marginLeft: 8, fontSize: 11, opacity: 0.7}}>
+                (scan automático a cada {config.frequenciaMin >= 60 ? `${config.frequenciaMin/60}h` : `${config.frequenciaMin}min`})
               </span>
-            ) : null}
+            )}
           </div>
         </div>
 
@@ -254,6 +267,36 @@ export default function RadarPage() {
           </div>
           <div className="section-title__hint" style={{ marginTop: 8 }}>
             So entram em Oportunidades se o modelo estiver nesta lista.
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-title">URLs monitoradas</div>
+
+          <div className="tag-list" style={{ marginBottom: 12 }}>
+            {config.seedUrls.length === 0 ? <span className="section-title__hint">Nenhuma URL cadastrada ainda.</span> : null}
+            {config.seedUrls.map((url) => (
+              <button key={url} type="button" className="model-tag" onClick={() => removeSeedUrl(url)}>
+                {url.length > 60 ? `${url.slice(0, 57)}...` : url} x
+              </button>
+            ))}
+          </div>
+
+          <div className="page-header__actions">
+            <input
+              type="url"
+              value={newSeedUrl}
+              onChange={(event) => setNewSeedUrl(event.target.value)}
+              placeholder="Cole uma URL real de anuncio para o radar monitorar"
+              style={{ maxWidth: 420 }}
+            />
+            <button type="button" className="btn" onClick={addSeedUrl}>
+              + Adicionar URL
+            </button>
+          </div>
+
+          <div className="section-title__hint" style={{ marginTop: 8 }}>
+            O scan real vai abrir essas URLs, extrair os dados e atualizar oportunidades automaticamente.
           </div>
         </section>
 

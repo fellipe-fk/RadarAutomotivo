@@ -6,7 +6,14 @@ import { getSystemStatus } from '@/lib/system-status'
 export async function GET(req: NextRequest) {
   try {
     await requireAuth(req)
-    return NextResponse.json(getSystemStatus())
+
+    const status = getSystemStatus()
+
+    return NextResponse.json({
+      ...status,
+      radarEnabled: true,
+      autoScanEnabled: true,
+    })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Nao foi possivel carregar o status do sistema.' },

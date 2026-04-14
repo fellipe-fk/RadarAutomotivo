@@ -94,7 +94,10 @@ export default function LaudoPage() {
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const [profileResponse, historyResponse] = await Promise.all([fetch('/api/auth/me'), fetch('/api/laudo')])
+        const [profileResponse, historyResponse] = await Promise.all([
+          fetch('/api/auth/me', { credentials: 'same-origin' }),
+          fetch('/api/laudo', { credentials: 'same-origin' }),
+        ])
 
         if (profileResponse.ok) {
           const profileData = await profileResponse.json()
@@ -177,6 +180,7 @@ export default function LaudoPage() {
     try {
       const response = await fetch('/api/laudo', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plate: normalizedPlate,
@@ -192,7 +196,11 @@ export default function LaudoPage() {
       }
 
       if (!response.ok) {
-        setError(data.error || 'Nao foi possivel consultar o laudo agora.')
+        setError(
+          response.status === 401
+            ? 'Sua sessao expirou ou nao foi enviada no pedido. Atualize a pagina e tente de novo.'
+            : data.error || 'Nao foi possivel consultar o laudo agora.'
+        )
         return
       }
 

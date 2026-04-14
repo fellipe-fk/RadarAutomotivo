@@ -29,7 +29,7 @@ type FipeReference = {
 }
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
-const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini'
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
 const ANALYSIS_SCHEMA = {
   type: 'object',
