@@ -22,6 +22,12 @@ export class NotAVehicleError extends Error {
   }
 }
 
+export function isPriceValid(price: number | null | undefined, vehicleType: 'MOTO' | 'CARRO'): boolean {
+  if (price == null || Number.isNaN(price)) return false
+  const minimum = vehicleType === 'MOTO' ? 2000 : 5000
+  return price >= minimum
+}
+
 const MOTO_TOKENS = [
   'moto',
   'motocicleta',

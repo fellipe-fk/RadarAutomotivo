@@ -1,84 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeRadarConfig } from '@/lib/radar'
+import { processUrl } from '@/lib/radar-auto-scan'
 
-function isAuthError(error: unknown) {
-  return error instanceof Error && /(autenticado|token|sessao|assinatura)/i.test(error.message)
+function isCronAuthorized(request: NextRequest) {
+  const authHeader = request.headers.get('authorization') || ''
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+  const cronSecret = process.env.CRON_SECRET?.trim()
+
+  return Boolean(token && cronSecret && token === cronSecret)
 }
 
-function getIntervalMinutes(frequenciaMin?: number) {
-  const value = Number(frequenciaMin || 0)
-  if (value >= 240) return 240
-  if (value >= 120) return 120
-  if (value >= 60) return 60
-  return 30
+async function getLastListingDate(userId: string) {
+  const lastListing = await prisma.listing.findFirst({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true },
+  })
+
+  return lastListing?.createdAt || null
 }
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request)
-    const sessionToken = request.headers.get('x-auto-scan-token')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (cronSecret && sessionToken !== cronSecret) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+    if (!isCronAuthorized(request)) {
+      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 })
     }
 
-    const configRecord = await prisma.radarConfig.findUnique({ where: { userId: user.id } })
-    const normalized = normalizeRadarConfig(configRecord)
-    const now = new Date()
-
-    if (!normalized.ativo) {
-      return NextResponse.json({ skipped: true, reason: 'Radar pausado' })
-    }
-
-    const lastScanAt = configRecord?.updatedAt || null
-    const intervalMinutes = getIntervalMinutes(normalized.frequenciaMin)
-
-    if (lastScanAt) {
-      const elapsedMinutes = Math.floor((now.getTime() - new Date(lastScanAt).getTime()) / 60000)
-      if (elapsedMinutes < intervalMinutes) {
-        return NextResponse.json({
-          skipped: true,
-          reason: 'Ainda nao venceu a frequencia configurada',
-          nextScanInMinutes: intervalMinutes - elapsedMinutes,
-        })
-      }
-    }
-
-    const scanResponse = await fetch(new URL('/api/radar/scan', request.url), {
-      method: 'POST',
-      headers: {
-        Cookie: request.headers.get('cookie') || '',
-        Authorization: request.headers.get('authorization') || '',
-        'x-auto-scan-token': cronSecret || '',
+    const users = await prisma.user.findMany({
+      where: {
+        radarConfig: {
+          is: {
+            ativo: true,
+          },
+        },
+      },
+      select: {
+        id: true,
       },
     })
 
-    const scanData = await scanResponse.json()
-
-    if (!scanResponse.ok) {
-      return NextResponse.json(
-        {
-          error: scanData.error || 'Falha ao executar auto-scan',
-          summary: scanData.summary || null,
-        },
-        { status: scanResponse.status }
-      )
+    const summary = {
+      usersTotal: users.length,
+      usersProcessed: 0,
+      usersSkipped: 0,
+      listingsProcessed: 0,
+      alertsTriggered: 0,
     }
 
-    return NextResponse.json({
-      ok: true,
-      summary: scanData.summary,
-      items: scanData.items,
-    })
+    const results: Array<{
+      userId: string
+      processed: boolean
+      reason?: string
+    }> = []
+
+    for (const user of users) {
+      const config = await prisma.radarConfig.findUnique({ where: { userId: user.id } })
+      if (!config) {
+        summary.usersSkipped += 1
+        results.push({ userId: user.id, processed: false, reason: 'Sem configuracao de radar' })
+        continue
+      }
+
+      const normalizedConfig = normalizeRadarConfig(config)
+      const lastListingAt = await getLastListingDate(user.id)
+      const frequenciaMs = (config.frequenciaMin || 60) * 60 * 1000
+      const elapsed = lastListingAt ? Date.now() - lastListingAt.getTime() : Infinity
+
+      if (elapsed < frequenciaMs) {
+        summary.usersSkipped += 1
+        results.push({ userId: user.id, processed: false, reason: 'Fora da janela de frequencia' })
+        continue
+      }
+
+      summary.usersProcessed += 1
+
+      const manualUrls = Array.from(new Set((config.seedUrls || []).map((u) => u.trim()).filter(Boolean))).slice(0, 20)
+      const userResults: Array<{ url: string; title?: string; status: string; detail: string }> = []
+
+      for (const sourceUrl of manualUrls) {
+        try {
+          const result = await processUrl(sourceUrl, user.id, normalizedConfig)
+          summary.listingsProcessed += result.item.status === 'skipped' ? 0 : 1
+          if (result.alerted) summary.alertsTriggered += 1
+          userResults.push(result.item)
+        } catch (error) {
+          userResults.push({
+            url: sourceUrl,
+            status: 'skipped',
+            detail: error instanceof Error ? error.message : 'Falha ao processar URL',
+          })
+        }
+      }
+
+      results.push({ userId: user.id, processed: true })
+    }
+
+    return NextResponse.json({ summary, results })
   } catch (error) {
-    if (isAuthError(error)) {
-      return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
-    }
-
     console.error('Erro ao executar auto-scan:', error)
     return NextResponse.json({ error: 'Erro ao executar auto-scan' }, { status: 500 })
   }
