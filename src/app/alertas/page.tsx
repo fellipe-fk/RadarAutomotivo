@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 import Sidebar from '@/components/ui/Sidebar'
-import { formatRiskLabel, matchesRadar, safeNumber, type RadarConfigLike } from '@/lib/radar'
+import { formatRiskLabel, matchesRadar, type RadarConfigLike } from '@/lib/radar'
 import { Listing } from '@/types'
 
 type UserProfile = {
@@ -87,10 +87,7 @@ export default function AlertasPage() {
     fetchData()
   }, [])
 
-  const matchedListings = useMemo(
-    () => listings.filter((listing) => matchesRadar(listing, config)),
-    [config, listings]
-  )
+  const matchedListings = useMemo(() => listings.filter((listing) => matchesRadar(listing, config)), [config, listings])
 
   const channels = useMemo(
     () => [
@@ -123,26 +120,26 @@ export default function AlertasPage() {
   const ruleCards = [
     {
       id: 'AL-01',
-      title: 'Score minimo',
-      description: 'Anuncios so entram nos alertas quando cruzam a linha minima de oportunidade configurada.',
+      title: 'Score mínimo',
+      description: 'Anúncios só entram nos alertas quando cruzam a linha mínima de oportunidade configurada.',
       value: `${config?.scoreAlerta ?? 75} pontos`,
     },
     {
       id: 'AL-02',
-      title: 'Risco maximo',
-      description: 'Limita notificacoes a oportunidades com nivel de risco compativel com sua operacao.',
+      title: 'Risco máximo',
+      description: 'Limita notificações a oportunidades com nível de risco compatível com sua operação.',
       value: formatRiskLabel(config?.riscoMax),
     },
     {
       id: 'AL-03',
-      title: 'Margem minima',
-      description: 'Mantem o fluxo focado em oportunidades com retorno economico suficiente para revenda.',
+      title: 'Margem mínima',
+      description: 'Mantém o fluxo focado em oportunidades com retorno econômico suficiente para revenda.',
       value: formatMoney(config?.margemMin),
     },
     {
       id: 'AL-04',
-      title: 'Distancia maxima',
-      description: 'Considera somente negocios dentro do raio que faz sentido visitar ou negociar.',
+      title: 'Distância máxima',
+      description: 'Considera somente negócios dentro do raio que faz sentido visitar ou negociar.',
       value: `${config?.distanciaMax ?? 120} km`,
     },
   ]
@@ -154,8 +151,8 @@ export default function AlertasPage() {
       <main className="main-content">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Configuracao de alertas</h1>
-            <p className="page-subtitle">Defina quando e como receber notificacoes de oportunidades.</p>
+            <h1 className="page-title">Configuração de alertas</h1>
+            <p className="page-subtitle">Defina quando e como receber notificações de oportunidades.</p>
           </div>
 
           <div className="page-header__actions">
@@ -163,7 +160,7 @@ export default function AlertasPage() {
               Ajustar radar
             </Link>
             <Link href="/perfil" className="btn btn-primary">
-              Canais e preferencias
+              Canais e preferências
             </Link>
           </div>
         </div>
@@ -171,8 +168,7 @@ export default function AlertasPage() {
         <div className={`radar-status ${config?.ativo === false ? 'off' : 'on'}`}>
           <div className={`rdot ${config?.ativo === false ? 'off' : 'on'}`} />
           <div>
-            <strong>{config?.ativo === false ? 'Radar pausado' : 'Radar ativo'}</strong> |{' '}
-            {matchedListings.length} oportunidades prontas para disparo nos canais habilitados
+            <strong>{config?.ativo === false ? 'Radar pausado' : 'Radar ativo'}</strong> | {matchedListings.length} oportunidades prontas para disparo nos canais habilitados
           </div>
         </div>
 
@@ -186,19 +182,19 @@ export default function AlertasPage() {
           <article className="metric-card">
             <div className="label">Alertas enviados</div>
             <div className="value">{stats.sentCount}</div>
-            <div className="sub">historico confirmado</div>
+            <div className="sub">histórico confirmado</div>
           </article>
 
           <article className="metric-card">
             <div className="label">Falhas</div>
             <div className="value">{stats.failedCount}</div>
-            <div className="sub">tentativas nao entregues</div>
+            <div className="sub">tentativas não entregues</div>
           </article>
 
           <article className="metric-card">
             <div className="label">Canais ativos</div>
             <div className="value">{channels.filter((channel) => channel.status === 'Ativo').length}</div>
-            <div className="sub">de 4 disponiveis</div>
+            <div className="sub">de 4 disponíveis</div>
           </article>
         </div>
 
@@ -214,7 +210,7 @@ export default function AlertasPage() {
                 <h3 className="section-title">{rule.title}</h3>
                 <p>{rule.description}</p>
                 <div className="metric" style={{ marginTop: 12 }}>
-                  <div className="metric-label">Parametro atual</div>
+                  <div className="metric-label">Parâmetro atual</div>
                   <div className="metric-value">{rule.value}</div>
                 </div>
               </article>
@@ -245,11 +241,13 @@ export default function AlertasPage() {
             <div className="alert-preview">
               {previewListing ? (
                 <>
-                  <div>{history[0] ? 'Ultimo alerta registrado' : 'Nova oportunidade forte detectada'}</div>
+                  <div>{history[0] ? 'Último alerta registrado' : 'Nova oportunidade forte detectada'}</div>
                   <div>{previewListing.title}</div>
-                  <div>Score {previewListing.opportunityScore || 0} | {formatMoney(previewListing.price)}</div>
                   <div>
-                    {previewListing.city || 'Cidade nao informada'} | margem estimada {formatMoney(previewListing.estimatedMargin)}
+                    Score {previewListing.opportunityScore || 0} | {formatMoney(previewListing.price)}
+                  </div>
+                  <div>
+                    {previewListing.city || 'Cidade não informada'} | margem estimada {formatMoney(previewListing.estimatedMargin)}
                   </div>
                 </>
               ) : (
@@ -257,7 +255,9 @@ export default function AlertasPage() {
               )}
             </div>
 
-            <div className="card-title" style={{ marginTop: 18 }}>Historico real de alertas</div>
+            <div className="card-title" style={{ marginTop: 18 }}>
+              Histórico real de alertas
+            </div>
             <div className="scan-log">
               {loading ? <div className="scan-log__line">Carregando...</div> : null}
               {!loading && history.length === 0 ? <div className="scan-log__line">Nenhum alerta disparado ainda.</div> : null}
@@ -267,7 +267,8 @@ export default function AlertasPage() {
                       key={alert.id}
                       className={alert.sent ? 'scan-log__line scan-log__line--ok' : 'scan-log__line scan-log__line--skip'}
                     >
-                      {(alert.listing?.title || alert.channel).slice(0, 80)} | {alert.sent ? `enviado via ${alert.channel}` : alert.errorMsg || 'falha no envio'}
+                      {(alert.listing?.title || alert.channel).slice(0, 80)} |{' '}
+                      {alert.sent ? `enviado via ${alert.channel}` : alert.errorMsg || 'falha no envio'}
                     </div>
                   ))
                 : null}

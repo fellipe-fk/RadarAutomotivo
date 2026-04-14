@@ -104,12 +104,12 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
     }
 
     if (!form.sourceUrl && !form.title && !form.description) {
-      setError('Cole o link do anuncio ou descreva manualmente os dados principais.')
+      setError('Preencha um link ou informe manualmente os dados principais.')
       return
     }
 
     if (!form.sourceUrl && !form.price) {
-      setError('No preenchimento manual, informe o preco pedido para calcular score e margem.')
+      setError('Informe o preco pedido para calcular score e margem.')
       return
     }
 
@@ -146,19 +146,17 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
     <div className="analyze-form">
       {systemStatus?.aiConfigured === false ? (
         <div className="analyze-warning">
-          <strong>IA do sistema indisponivel</strong> no momento. Configure a chave da OpenAI no servidor para ativar a analise.
-          <div className="analyze-warning__hint">Assim que a chave do sistema estiver ativa, este formulario passa a ler e enriquecer o link automaticamente.</div>
+          <strong>Servico de analise indisponivel</strong> no momento.
+          <div className="analyze-warning__hint">Tente novamente em instantes ou use o preenchimento manual.</div>
         </div>
       ) : (
         <div className="panel-muted" style={{ marginBottom: 16 }}>
-          {systemStatus
-            ? `${systemStatus.aiProvider} conectada no servidor. O link do anuncio sera lido no backend antes da analise.`
-            : 'Validando conexao com a IA do sistema...'}
+          {systemStatus ? 'Preparado para analisar o anuncio no backend.' : 'Validando conexao com o servico de analise...'}
         </div>
       )}
 
       <div className="analyze-link-card">
-        <div className="analyze-link-card__title">Cole o link do anuncio</div>
+        <div className="analyze-link-card__title">Link do anuncio</div>
 
         <div className="analyze-link-row">
           <input
@@ -196,7 +194,6 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
           <div className="analyze-provider">
             <span>OK</span>
             <span>{providerLabel}</span>
-            <span className="analyze-provider__hint">- o servidor vai extrair os dados reais da pagina antes da IA montar o parecer.</span>
           </div>
         ) : null}
 
@@ -212,13 +209,13 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
 
       <div className="analyze-manual-toggle">
         <button type="button" onClick={() => setShowManual((current) => !current)}>
-          {showManual ? 'Ocultar preenchimento manual' : 'Nao tenho link - quero descrever manualmente'}
+          {showManual ? 'Ocultar preenchimento manual' : 'Preenchimento manual'}
         </button>
       </div>
 
       {showManual ? (
         <div className="analyze-manual-card">
-          <div className="analyze-manual-card__title">Preencher manualmente</div>
+          <div className="analyze-manual-card__title">Preenchimento manual</div>
 
           <div className="form-grid form-grid--2" style={{ marginBottom: 10 }}>
             <div>
@@ -303,7 +300,7 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
             </div>
             <div>
               <div className="analyze-form__loading-title">{analysisSteps[stepIndex]}</div>
-              <div className="analyze-form__loading-copy">O motor de analise esta lendo o anuncio e montando o resumo da oportunidade.</div>
+              <div className="analyze-form__loading-copy">Analisando o anuncio e montando o resumo da oportunidade.</div>
             </div>
           </div>
 

@@ -205,7 +205,7 @@ export default function LaudoPage() {
       }
 
       const createdLaudo = mapHistoryItem(data.laudo)
-      setCredits(data.remainingCredits ?? 0)
+            setCredits(data.remainingCredits ?? 0)
       setSelectedResult(createdLaudo)
       setHistory((current) => [createdLaudo, ...current.filter((item) => item.id !== createdLaudo.id)].slice(0, 8))
       setPlate(formatPlateDisplay(createdLaudo.placa))

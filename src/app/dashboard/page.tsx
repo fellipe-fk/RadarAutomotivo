@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Sidebar from '@/components/ui/Sidebar'
 import ListingCard from '@/components/listings/ListingCard'
-import { matchesRadar as listingMatchesRadar, safeNumber } from '@/lib/radar'
+import { safeNumber } from '@/lib/radar'
 import { Listing } from '@/types'
 
 type RadarConfig = {
@@ -22,7 +22,7 @@ function getGreeting() {
 }
 
 function formatRelativeTime(value?: string) {
-  if (!value) return 'sem scans ainda'
+  if (!value) return 'nenhum scan concluido ainda'
 
   const timestamp = new Date(value).getTime()
 
@@ -45,6 +45,10 @@ export default function DashboardPage() {
   const [radarConfig, setRadarConfig] = useState<RadarConfig | null>(null)
   const [alertStats, setAlertStats] = useState({ readyCount: 0, sentCount: 0, failedCount: 0 })
   const [crmStats, setCrmStats] = useState({ total: 0, negociando: 0, comprado: 0, profit: 0 })
+  const [radarSummary, setRadarSummary] = useState<{ lastScanAt: string | null; readyCount: number }>({
+    lastScanAt: null,
+    readyCount: 0,
+  })
   const [loading, setLoading] = useState(true)
 
   async function fetchDashboardData() {
@@ -65,12 +69,17 @@ export default function DashboardPage() {
       setRadarConfig(alertsData.config || null)
       setAlertStats(alertsData.stats || { readyCount: 0, sentCount: 0, failedCount: 0 })
       setCrmStats(crmData.stats || { total: 0, negociando: 0, comprado: 0, profit: 0 })
+      setRadarSummary({
+        lastScanAt: alertsData.stats?.lastTriggeredAt || null,
+        readyCount: alertsData.stats?.readyCount || 0,
+      })
     } catch (error) {
       console.error(error)
       setListings([])
       setRadarConfig(null)
       setAlertStats({ readyCount: 0, sentCount: 0, failedCount: 0 })
       setCrmStats({ total: 0, negociando: 0, comprado: 0, profit: 0 })
+      setRadarSummary({ lastScanAt: null, readyCount: 0 })
     } finally {
       setLoading(false)
     }
@@ -101,20 +110,17 @@ export default function DashboardPage() {
   }
 
   const metrics = useMemo(() => {
-    const radarListings = listings.filter((listing) => listingMatchesRadar(listing, radarConfig))
     const avgMargin =
-      radarListings.length > 0
-        ? radarListings.reduce((acc, listing) => acc + safeNumber(listing.estimatedMargin), 0) / radarListings.length
-        : 0
+      listings.length > 0 ? listings.reduce((acc, listing) => acc + safeNumber(listing.estimatedMargin), 0) / listings.length : 0
 
     return {
-      radarListings,
+      radarListings: listings.filter(() => true),
       avgMargin,
-      latestScanAt: listings[0]?.createdAt,
+      latestScanAt: radarSummary.lastScanAt,
     }
-  }, [listings, radarConfig])
+  }, [listings, radarSummary.lastScanAt])
 
-  const visibleListings = metrics.radarListings.length > 0 ? metrics.radarListings.slice(0, 4) : listings.slice(0, 4)
+  const visibleListings = metrics.radarListings.slice(0, 4)
 
   return (
     <div className="app-layout" data-page-id="dashboard">
@@ -138,13 +144,13 @@ export default function DashboardPage() {
           <div className="metric-card">
             <div className="label">Analisados</div>
             <div className="value">{listings.length}</div>
-            <div className="sub">total</div>
+            <div className="sub">total real no banco</div>
           </div>
 
           <div className="metric-card">
             <div className="label">No radar</div>
-            <div className="value dashboard-metric-value--primary">{alertStats.readyCount}</div>
-            <div className="sub">passaram nos filtros</div>
+            <div className="value dashboard-metric-value--primary">{radarSummary.readyCount}</div>
+            <div className="sub">itens prontos para alerta</div>
           </div>
 
           <div className="metric-card">
@@ -173,23 +179,25 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {loading ? <div className="dashboard-card__empty">Carregando oportunidades...</div> : null}
+          {loading ? <div className="dashboard-card__empty">Carregando oportunidades reais...</div> : null}
 
           {!loading && visibleListings.length === 0 ? (
             <div className="dashboard-card__empty">
-              <div className="empty-state__icon">?</div>
-              <div>Nenhuma oportunidade no radar ainda.</div>
+              <div className="empty-state__icon">!</div>
+              <div>Nenhuma oportunidade real encontrada ainda.</div>
               <a href="/analisar" className="btn btn-primary" style={{ marginTop: 14 }}>
                 Analisar primeiro anuncio
               </a>
             </div>
           ) : null}
 
-          <div className="listing-list">
-            {visibleListings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} onFavorite={handleFavorite} onDiscard={handleDiscard} />
-            ))}
-          </div>
+          {visibleListings.length > 0 ? (
+            <div className="listing-list">
+              {visibleListings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} onFavorite={handleFavorite} onDiscard={handleDiscard} />
+              ))}
+            </div>
+          ) : null}
         </section>
       </main>
     </div>

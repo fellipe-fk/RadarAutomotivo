@@ -83,12 +83,12 @@ export default function AnalyzePageClient() {
           <AnalyzeForm onAnalyzed={fetchRecent} />
 
           <div className="analyze-history">
-            <div className="analyze-history__title">Analisados nesta sessao</div>
+            <div className="analyze-history__title">Analisados nesta sessão</div>
 
-            {loadingRecent ? <div className="credit-footnote">Carregando historico...</div> : null}
+            {loadingRecent ? <div className="credit-footnote">Carregando histórico...</div> : null}
 
             {!loadingRecent && sessionHistory.length === 0 ? (
-              <div className="credit-footnote">Nenhum anuncio analisado ainda.</div>
+              <div className="credit-footnote">Nenhum anúncio analisado ainda.</div>
             ) : null}
 
             <div className="analyze-history__list">

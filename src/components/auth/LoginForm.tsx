@@ -59,12 +59,12 @@ export default function LoginForm() {
         </div>
 
         {IS_DEVELOPMENT ? (
-          <div className="panel-muted" style={{ marginBottom: 16 }}>
-            <strong>Conta demo local</strong>
+          <div className="auth-demo">
+            <strong>Conta de desenvolvimento</strong>
             <div>Email: {DEMO_EMAIL}</div>
             <div>Senha: {DEMO_PASSWORD}</div>
-            <button type="button" className="btn" onClick={fillDemoAccount} style={{ marginTop: 12 }}>
-              Preencher conta demo
+            <button type="button" className="btn" onClick={fillDemoAccount}>
+              Preencher acesso
             </button>
           </div>
         ) : null}
@@ -79,6 +79,7 @@ export default function LoginForm() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="voce@exemplo.com"
+            autoComplete="email"
             required
           />
 
@@ -91,6 +92,7 @@ export default function LoginForm() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Sua senha"
+            autoComplete="current-password"
             required
           />
 

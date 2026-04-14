@@ -16,6 +16,7 @@ export type RadarConfigLike = {
 }
 
 export type RadarListingLike = {
+  id?: string
   title: string
   brand?: string | null
   model?: string | null
@@ -28,6 +29,14 @@ export type RadarListingLike = {
   opportunityScore?: number | null
   estimatedMargin?: number | null
   riskLevel?: string | null
+  sourceUrl?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  userId?: string
+  status?: string
+  isDiscarded?: boolean
+  isFavorite?: boolean
+  alertSent?: boolean
 }
 
 export const DEFAULT_RADAR_CONFIG: Required<RadarConfigLike> = {

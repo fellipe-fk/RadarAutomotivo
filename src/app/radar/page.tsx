@@ -45,6 +45,7 @@ export default function RadarPage() {
   const [saving, setSaving] = useState(false)
   const [runningScan, setRunningScan] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [scanHistory, setScanHistory] = useState<Array<{ id: string; className: string; text: string }>>([])
 
   async function fetchRadarData() {
     setLoading(true)
@@ -60,6 +61,23 @@ export default function RadarPage() {
 
       setConfig(normalizeRadarConfig(configData.config))
       setListings(listingsData.listings || [])
+      setScanHistory((listingsData.listings || []).slice(0, 8).map((listing: Listing) => {
+        const passed = matchesRadar(listing, normalizeRadarConfig(configData.config))
+
+        if (passed) {
+          return {
+            id: listing.id,
+            className: 'scan-log__line scan-log__line--ok',
+            text: `${listing.title} | score ${safeNumber(listing.opportunityScore)} | encontrado no radar`,
+          }
+        }
+
+        return {
+          id: listing.id,
+          className: 'scan-log__line scan-log__line--skip',
+          text: `${listing.title} | nao atende aos filtros atuais`,
+        }
+      }))
     } catch (error) {
       console.error(error)
       setFeedback('Nao foi possivel carregar o radar agora.')
@@ -75,25 +93,7 @@ export default function RadarPage() {
   const radarListings = useMemo(() => listings.filter((listing) => matchesRadar(listing, config)), [config, listings])
   const latestScanAt = useMemo(() => listings[0]?.createdAt, [listings])
 
-  const scanLog = useMemo(() => {
-    return listings.slice(0, 8).map((listing) => {
-      const passed = matchesRadar(listing, config)
-
-      if (passed) {
-        return {
-          id: listing.id,
-          className: 'scan-log__line scan-log__line--ok',
-          text: `${listing.title} | score ${safeNumber(listing.opportunityScore)} | entrou em oportunidades`,
-        }
-      }
-
-      return {
-        id: listing.id,
-        className: 'scan-log__line scan-log__line--skip',
-        text: `${listing.title} | nao atende aos filtros atuais`,
-      }
-    })
-  }, [config, listings])
+  const scanLog = useMemo(() => scanHistory, [scanHistory])
 
   function updateConfigField(field: keyof typeof DEFAULT_RADAR_CONFIG, value: string | number | boolean | string[]) {
     setConfig((current) => ({
@@ -171,6 +171,13 @@ export default function RadarPage() {
       await fetchRadarData()
       const modeLabel =
         data.summary?.mode === 'search' ? 'busca automática' : data.summary?.mode === 'mixed' ? 'busca + URLs' : 'URLs manuais'
+      setScanHistory(
+        (data.items || []).slice(0, 8).map((item: { url: string; title?: string; status: string; detail: string }) => ({
+          id: `${item.url}-${item.status}`,
+          className: item.status === 'skipped' ? 'scan-log__line scan-log__line--skip' : 'scan-log__line scan-log__line--ok',
+          text: `${item.title || item.url} | ${item.detail}`,
+        }))
+      )
       setFeedback(
         `Scan real concluido via ${modeLabel}: ${data.summary.analyzed} analisados, ${data.summary.created} novos, ${data.summary.updated} atualizados e ${data.summary.alerted} alertas enviados.`
       )

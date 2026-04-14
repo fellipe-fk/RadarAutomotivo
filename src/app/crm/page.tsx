@@ -218,8 +218,8 @@ export default function CRMPage() {
       <main className="main-content">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Meu portfolio</h1>
-            <p className="page-subtitle">Gerencie cada veiculo do interesse a revenda</p>
+        <h1 className="page-title">Meu portfolio</h1>
+        <p className="page-subtitle">Gerencie cada veiculo do interesse a revenda</p>
           </div>
 
           <button type="button" className="btn btn-primary" onClick={() => setShowForm((current) => !current)}>

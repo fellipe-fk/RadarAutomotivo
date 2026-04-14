@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import Sidebar from '@/components/ui/Sidebar'
-import type { Listing } from '@/types'
 
 type FormState = {
   purchasePrice: string
@@ -17,8 +16,8 @@ type FormState = {
 }
 
 const DEFAULT_FORM: FormState = {
-  purchasePrice: '21900',
-  vehicle: 'Honda XRE 300 2021',
+  purchasePrice: '',
+  vehicle: '',
   distance: '38',
   fuelPrice: '6.29',
   reviewCost: '400',
@@ -31,13 +30,6 @@ function toNumber(value: string) {
   const normalized = value.replace(',', '.')
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
-}
-
-function normalizeText(value: string) {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function formatMoney(value: number) {
@@ -58,7 +50,6 @@ function calculateMonthlyInstallment(principal: number, monthlyRate: number, mon
 export default function CalculadoraPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [consumoKmL, setConsumoKmL] = useState(12)
-  const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -82,29 +73,18 @@ export default function CalculadoraPage() {
       setLoading(true)
 
       try {
-        const [profileResponse, listingsResponse] = await Promise.all([
-          fetch('/api/auth/me'),
-          fetch('/api/listings?status=ANALYZED'),
-        ])
+        const response = await fetch('/api/auth/me')
 
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json()
+        if (response.ok) {
+          const profileData = await response.json()
           const consumo = Number(profileData.user?.consumoKmL)
 
           if (Number.isFinite(consumo) && consumo > 0) {
             setConsumoKmL(consumo)
           }
         }
-
-        if (listingsResponse.ok) {
-          const listingsData = await listingsResponse.json()
-          setListings(listingsData.listings || [])
-        } else {
-          setListings([])
-        }
       } catch (error) {
         console.error(error)
-        setListings([])
       } finally {
         setLoading(false)
       }
@@ -148,68 +128,6 @@ export default function CalculadoraPage() {
     }
   }, [consumoKmL, form])
 
-  const relatedListings = useMemo(() => {
-    const tokens = normalizeText(form.vehicle)
-      .split(/\s+/)
-      .filter((token) => token.length > 2)
-      .slice(0, 4)
-
-    if (listings.length === 0) return []
-
-    const scored = listings
-      .map((listing) => {
-        const haystack = normalizeText(
-          [listing.title, listing.brand, listing.model, listing.year ? String(listing.year) : '']
-            .filter(Boolean)
-            .join(' ')
-        )
-
-        const matchCount = tokens.reduce((count, token) => (haystack.includes(token) ? count + 1 : count), 0)
-        const baselinePrice = listing.avgMarketPrice || listing.fipePrice || listing.price
-
-        return {
-          listing,
-          matchCount,
-          distanceToRecommendation: Math.abs(baselinePrice - calculations.recommendedPrice),
-        }
-      })
-      .filter((item) => item.matchCount > 0)
-      .sort((left, right) => {
-        if (right.matchCount !== left.matchCount) {
-          return right.matchCount - left.matchCount
-        }
-
-        return left.distanceToRecommendation - right.distanceToRecommendation
-      })
-      .slice(0, 3)
-      .map((item) => item.listing)
-
-    if (scored.length > 0) {
-      return scored
-    }
-
-    return listings.slice(0, 3)
-  }, [calculations.recommendedPrice, form.vehicle, listings])
-
-  const marketStats = useMemo(() => {
-    if (relatedListings.length === 0) {
-      return {
-        average: calculations.purchasePrice * 1.12,
-        minimum: calculations.purchasePrice * 0.92,
-        maximum: calculations.purchasePrice * 1.24,
-      }
-    }
-
-    const prices = relatedListings.map((listing) => listing.avgMarketPrice || listing.fipePrice || listing.price)
-    const total = prices.reduce((sum, value) => sum + value, 0)
-
-    return {
-      average: total / prices.length,
-      minimum: Math.min(...prices),
-      maximum: Math.max(...prices),
-    }
-  }, [calculations.purchasePrice, relatedListings])
-
   const financingScenarios = useMemo(() => {
     const sellingPrice = calculations.recommendedPrice
     const monthlyRate = 0.0219
@@ -237,17 +155,17 @@ export default function CalculadoraPage() {
       <main className="main-content">
         <header className="page-header">
           <div>
-            <h1 className="page-title">Calculadora de precificacao</h1>
-            <p className="page-subtitle">Simule a margem de revenda e o melhor preco de venda</p>
+            <h1 className="page-title">Calculadora de precificação</h1>
+            <p className="page-subtitle">Simule a margem de revenda e o melhor preço de venda</p>
           </div>
         </header>
 
-        <div className="calculator-layout" style={{ maxWidth: 800 }}>
-          <section className="card">
+        <div className="calculator-layout">
+          <section className="card calculator-card">
             <div className="card-title">Dados da compra</div>
 
             <div className="form-group">
-              <label className="form-label">Preco de compra (R$)</label>
+              <label className="form-label">Preço de compra (R$)</label>
               <input
                 type="number"
                 value={form.purchasePrice}
@@ -256,13 +174,13 @@ export default function CalculadoraPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Veiculo</label>
+              <label className="form-label">Veículo</label>
               <input value={form.vehicle} onChange={(event) => setForm({ ...form, vehicle: event.target.value })} />
             </div>
 
             <div className="form-grid form-grid--2">
               <div className="form-group">
-                <label className="form-label">Distancia (km)</label>
+                <label className="form-label">Distância (km)</label>
                 <input
                   type="number"
                   value={form.distance}
@@ -271,7 +189,7 @@ export default function CalculadoraPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Combustivel (R$/L)</label>
+                <label className="form-label">Combustível (R$/L)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -283,7 +201,7 @@ export default function CalculadoraPage() {
 
             <div className="form-grid form-grid--2">
               <div className="form-group">
-                <label className="form-label">Revisao estimada (R$)</label>
+                <label className="form-label">Revisão estimada (R$)</label>
                 <input
                   type="number"
                   value={form.reviewCost}
@@ -292,7 +210,7 @@ export default function CalculadoraPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Transferencia + DETRAN</label>
+                <label className="form-label">Transferência + DETRAN</label>
                 <input
                   type="number"
                   value={form.transferCost}
@@ -311,7 +229,7 @@ export default function CalculadoraPage() {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Margem minima desejada (%)</label>
+              <label className="form-label">Margem mínima desejada (%)</label>
               <input
                 type="number"
                 value={form.targetMargin}
@@ -321,12 +239,12 @@ export default function CalculadoraPage() {
           </section>
 
           <div className="calc-card-stack">
-            <section className="card">
+            <section className="card calculator-card">
               <div className="card-title">Resultado</div>
 
               <div className="calc-result">
                 <div className="calc-row">
-                  <span>Preco de compra</span>
+                  <span>Preço de compra</span>
                   <strong>{formatMoney(calculations.purchasePrice)}</strong>
                 </div>
                 <div className="calc-row">
@@ -334,11 +252,11 @@ export default function CalculadoraPage() {
                   <strong className="calc-neg">- {formatMoney(calculations.travelCost)}</strong>
                 </div>
                 <div className="calc-row">
-                  <span>Revisao e limpeza</span>
+                  <span>Revisão e limpeza</span>
                   <strong className="calc-neg">- {formatMoney(calculations.reviewCost)}</strong>
                 </div>
                 <div className="calc-row">
-                  <span>Transferencia e taxas</span>
+                  <span>Transferência e taxas</span>
                   <strong className="calc-neg">- {formatMoney(calculations.transferCost)}</strong>
                 </div>
                 {calculations.otherCosts > 0 ? (
@@ -353,21 +271,21 @@ export default function CalculadoraPage() {
                 </div>
               </div>
 
-              <div className="metric-grid" style={{ marginTop: 14 }}>
+              <div className="metric-grid metric-grid--3" style={{ marginTop: 14 }}>
                 <article className="metric-card">
-                  <p className="metric-label">Preco minimo</p>
+                  <p className="metric-label">Preço mínimo</p>
                   <div className="metric-value">{formatMoney(calculations.minimumPrice)}</div>
                   <p className="metric-sub">{calculations.targetMargin}% de margem alvo</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Preco recomendado</p>
+                  <p className="metric-label">Preço recomendado</p>
                   <div className="metric-value">{formatMoney(calculations.recommendedPrice)}</div>
                   <p className="metric-sub">Faixa para giro com boa competitividade</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Preco premium</p>
+                  <p className="metric-label">Preço premium</p>
                   <div className="metric-value">{formatMoney(calculations.premiumPrice)}</div>
-                  <p className="metric-sub">Se o carro estiver acima da media local</p>
+                  <p className="metric-sub">Se o carro estiver acima da média local</p>
                 </article>
               </div>
 
@@ -385,46 +303,7 @@ export default function CalculadoraPage() {
               </div>
             </section>
 
-            <section className="card">
-              <div className="card-title">Comparacao de mercado</div>
-
-              <div className="calc-result">
-                <div className="calc-row">
-                  <span>Preco medio regional</span>
-                  <strong>{formatMoney(marketStats.average)}</strong>
-                </div>
-                <div className="calc-row">
-                  <span>Minimo encontrado</span>
-                  <strong>{formatMoney(marketStats.minimum)}</strong>
-                </div>
-                <div className="calc-row">
-                  <span>Maximo encontrado</span>
-                  <strong>{formatMoney(marketStats.maximum)}</strong>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 12 }}>
-                {loading ? <div className="calc-market-copy">Carregando referencias de mercado...</div> : null}
-                {relatedListings.length > 0 ? (
-                  relatedListings.map((listing) => (
-                    <div key={listing.id} className="mini-card" style={{ marginBottom: 8 }}>
-                      <strong>{listing.title}</strong>
-                      <div>{formatMoney(listing.avgMarketPrice || listing.fipePrice || listing.price)}</div>
-                      <span>
-                        {listing.source} · {listing.city || 'Cidade nao informada'} · score {listing.opportunityScore || 0}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="calc-market-copy">
-                    Nenhum anuncio semelhante encontrado ainda. Assim que voce analisar mais oportunidades, a comparacao
-                    de mercado passa a refletir sua base real.
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="card">
+            <section className="card calculator-card">
               <div className="card-title">Simulador de financiamento para o comprador</div>
 
               {financingScenarios.map((scenario) => (
@@ -434,14 +313,14 @@ export default function CalculadoraPage() {
                   </strong>
                   <div>{formatMoney(scenario.entryValue)} de entrada</div>
                   <span>
-                    {scenario.months}x de {formatMoney(scenario.monthlyInstallment)} com taxa media de 2,19% a.m.
+                    {scenario.months}x de {formatMoney(scenario.monthlyInstallment)} com taxa média de 2,19% a.m.
                   </span>
                 </div>
               ))}
 
               <div className="calc-market-copy">
-                Use este bloco para testar se o preco sugerido continua financiavel para o perfil de cliente que voce
-                costuma atender.
+                Use este bloco para testar se o preço sugerido continua financiável para o perfil de cliente que você costuma
+                atender.
               </div>
             </section>
           </div>

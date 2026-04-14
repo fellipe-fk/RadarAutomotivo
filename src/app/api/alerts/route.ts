@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       config = await prisma.radarConfig.create({ data: { userId: user.id } })
     }
 
-    const [alerts, listings] = await Promise.all([
+    const [alerts, listings, radarLogs] = await Promise.all([
       prisma.alert.findMany({
         where: { userId: user.id },
         include: {
@@ -45,13 +45,60 @@ export async function GET(req: NextRequest) {
         },
         orderBy: [{ createdAt: 'desc' }],
       }),
+      prisma.listing.findMany({
+        where: {
+          userId: user.id,
+          isDiscarded: false,
+        },
+        select: {
+          id: true,
+          title: true,
+          sourceUrl: true,
+          status: true,
+          opportunityScore: true,
+          createdAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 50,
+      }),
     ])
 
     const normalizedConfig = normalizeRadarConfig(config)
     const readyListings = listings.filter((listing) => matchesRadar(listing, normalizedConfig))
     const sentAlerts = alerts.filter((alert) => alert.sent)
     const failedAlerts = alerts.filter((alert) => !alert.sent)
-    const lastScanAt = alerts[0]?.createdAt || null
+    const radarPreview = radarLogs.slice(0, 8).map((listing) => {
+      const passed = matchesRadar(
+        {
+          id: listing.id,
+          title: listing.title,
+          sourceUrl: listing.sourceUrl,
+          type: 'CARRO',
+          price: 0,
+          source: 'manual',
+          createdAt: listing.createdAt,
+          updatedAt: listing.createdAt,
+          userId: user.id,
+          status: listing.status,
+          isDiscarded: false,
+          isFavorite: false,
+          alertSent: false,
+        },
+        normalizedConfig
+      )
+
+      return {
+        id: listing.id,
+        title: listing.title,
+        sourceUrl: listing.sourceUrl,
+        opportunityScore: listing.opportunityScore,
+        status: listing.status,
+        className: passed ? 'scan-log__line scan-log__line--ok' : 'scan-log__line scan-log__line--skip',
+        text: passed
+          ? `${listing.title} | score ${listing.opportunityScore ?? 0} | encontrado no radar`
+          : `${listing.title} | nao atende aos filtros atuais`,
+      }
+    })
 
     return NextResponse.json({
       config: normalizedConfig,
@@ -64,6 +111,7 @@ export async function GET(req: NextRequest) {
       },
       history: alerts,
       preview: readyListings[0] || null,
+      radarPreview,
     })
   } catch (error) {
     if (isAuthError(error)) {

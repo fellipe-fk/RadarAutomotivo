@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
       mode: 'mixed' as 'mixed' | 'search' | 'urls',
     }
     const items: Array<{ url: string; title?: string; status: 'created' | 'updated' | 'skipped'; detail: string; listingId?: string }> = []
+    const diagnostics: Array<{ modelo: string; fonte: string; searchUrl: string; found: number }> = []
 
     const manualUrls = Array.from(new Set((config.seedUrls || []).map((u) => u.trim()).filter(Boolean))).slice(0, 20)
 
@@ -178,6 +179,7 @@ export async function POST(request: NextRequest) {
           for (const searchUrl of buildSearchUrls(modelo, fonte)) {
             const links = await extractLinksFromSearchPage(searchUrl, modelo)
             searchUrls.push(...links)
+            diagnostics.push({ modelo, fonte, searchUrl, found: links.length })
           }
         }
       }
@@ -185,18 +187,27 @@ export async function POST(request: NextRequest) {
 
     const allUrls = Array.from(new Set([...manualUrls, ...searchUrls])).slice(0, 30)
 
+    summary.total = allUrls.length
+    summary.mode = manualUrls.length > 0 && searchUrls.length > 0 ? 'mixed' : searchUrls.length > 0 ? 'search' : 'urls'
+
     if (allUrls.length === 0) {
       return NextResponse.json(
         {
-          error: 'Nenhuma URL encontrada para processar. Adicione URLs manuais ou configure modelos e fontes.',
-          hint: 'Configure pelo menos um modelo e uma fonte no radar.',
+          error: 'Nenhuma URL encontrada para processar.',
+          hint: 'Adicione URLs manuais em seedUrls ou configure pelo menos um modelo e uma fonte válidos.',
+          diagnostics: {
+            manualUrls: manualUrls.length,
+            searchUrls: searchUrls.length,
+            modelos: normalizedConfig.modelos.length,
+            fontes: normalizedConfig.fontes.length,
+            searches: diagnostics,
+          },
+          summary,
+          items,
         },
         { status: 400 }
       )
     }
-
-    summary.total = allUrls.length
-    summary.mode = manualUrls.length > 0 && searchUrls.length > 0 ? 'mixed' : searchUrls.length > 0 ? 'search' : 'urls'
 
     for (const sourceUrl of allUrls) {
       try {
@@ -224,7 +235,7 @@ export async function POST(request: NextRequest) {
 
     await auditLog(user.id, 'radar.scan', request, summary)
 
-    return NextResponse.json({ summary, items })
+    return NextResponse.json({ summary, items, diagnostics })
   } catch (error) {
     if (isAuthError(error)) {
       return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
