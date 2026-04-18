@@ -196,6 +196,30 @@ select {
   background: var(--bg);
 }
 
+.sidebar__logout {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: #666;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sidebar__logout:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sidebar__logout:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .sidebar__avatar {
   width: 34px;
   height: 34px;
@@ -1307,11 +1331,63 @@ select:focus {
   margin-top: 3px;
 }
 
+.subscription-hero--warning {
+  background: #fff8e6;
+  border-color: #f0c86a;
+}
+
+.subscription-hero--warning .subscription-hero__icon {
+  background: #d39b13;
+}
+
+.subscription-hero--muted {
+  background: #f3f4f7;
+  border-color: #cfd5df;
+}
+
+.subscription-hero--muted .subscription-hero__icon {
+  background: #748096;
+}
+
+.subscription-hero--default {
+  background: #eef4ff;
+  border-color: #a9c3ef;
+}
+
+.subscription-hero--default .subscription-hero__icon {
+  background: #2d69b3;
+}
+
+.billing-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.billing-actions-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(420px, 1.2fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.billing-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
 .plan-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
+}
+
+.plan-cards--compact {
+  margin-bottom: 0;
 }
 
 .plan-card {
@@ -1369,7 +1445,7 @@ select:focus {
 }
 
 .plan-items li::before {
-  content: '✓';
+  content: '\2713';
   color: var(--success);
   font-weight: 700;
   font-size: 11px;
@@ -2139,7 +2215,10 @@ select:focus {
   .radar-config-grid,
   .dashboard-metric-grid,
   .page-grid--analysis,
+  .billing-summary-grid,
+  .billing-actions-grid,
   .plan-cards,
+  .plan-cards--compact,
   .profile-grid,
   .kanban,
   .analytics-grid,

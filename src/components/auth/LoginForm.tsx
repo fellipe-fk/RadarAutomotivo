@@ -105,7 +105,7 @@ export default function LoginForm() {
 
         <div className="auth-footer">
           <span>Ainda nao tem conta?</span>
-          <Link href="/cadastro">Criar conta gratis</Link>
+          <Link href="/checkout?plan=PRO">Comecar pelo checkout</Link>
         </div>
       </div>
     </div>

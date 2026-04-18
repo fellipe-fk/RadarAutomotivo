@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 
+import { formatPlanLabel } from '@/lib/plans'
 import { formatRiskLabel } from '@/lib/radar'
+import { formatSubscriptionStatus } from '@/lib/subscription-state'
 
 type SidebarUser = {
   name: string
@@ -57,6 +59,16 @@ const primaryItems: NavItem[] = [
       <>
         <circle cx="8" cy="8" r="6" />
         <path d="M8 5v3l2 2" />
+      </>
+    ),
+  },
+  {
+    href: '/favoritos',
+    label: 'Favoritos',
+    id: 'favoritos',
+    icon: iconNode(
+      <>
+        <path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z" />
       </>
     ),
   },
@@ -126,6 +138,19 @@ const systemItems: NavItem[] = [
     ),
   },
   {
+    href: '/lixeira',
+    label: 'Lixeira',
+    id: 'lixeira',
+    icon: iconNode(
+      <>
+        <path d="M3 4h10" />
+        <path d="M5 4V2h6v2" />
+        <path d="M4 4l1 10h6L12 4" />
+        <path d="M7 7v4M9 7v4" />
+      </>
+    ),
+  },
+  {
     href: '/laudo',
     label: 'Laudo veicular',
     id: 'laudo',
@@ -175,17 +200,7 @@ const systemItems: NavItem[] = [
 ]
 
 function formatPlan(plano?: string) {
-  if (plano === 'AGENCIA') return 'Plano Agencia'
-  if (plano === 'PRO') return 'Plano Pro'
-  return 'Plano Basico'
-}
-
-function formatStatus(status?: string) {
-  if (status === 'ATIVA') return 'ativo'
-  if (status === 'TRIAL') return 'trial'
-  if (status === 'SUSPENSA') return 'suspenso'
-  if (status === 'CANCELADA') return 'cancelado'
-  return 'ativo'
+  return `Plano ${formatPlanLabel(plano)}`
 }
 
 export default function Sidebar() {
@@ -193,6 +208,7 @@ export default function Sidebar() {
   const [user, setUser] = useState<SidebarUser | null>(null)
   const [config, setConfig] = useState<RadarConfig | null>(null)
   const [opportunityCount, setOpportunityCount] = useState(0)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -243,7 +259,7 @@ export default function Sidebar() {
   }, [user?.name])
 
   const planText = useMemo(() => {
-    return `${formatPlan(user?.plano)} - ${formatStatus(user?.assinaturaStatus)}`
+    return `${formatPlan(user?.plano)} - ${formatSubscriptionStatus(user?.assinaturaStatus)}`
   }, [user?.assinaturaStatus, user?.plano])
 
   const radarHint = useMemo(() => {
@@ -251,6 +267,23 @@ export default function Sidebar() {
     if (!config?.scoreAlerta) return 'Radar ativo'
     return `Radar ativo - score ${config.scoreAlerta}+ - risco ${formatRiskLabel(config.riscoMax)}`
   }, [config])
+
+  async function handleLogout() {
+    if (loggingOut) return
+
+    setLoggingOut(true)
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
+    } catch (error) {
+      console.error(error)
+    } finally {
+      window.location.assign('/login')
+    }
+  }
 
   function renderBadge(item: NavItem) {
     if (item.id === 'oportunidades' && opportunityCount > 0) {
@@ -344,6 +377,10 @@ export default function Sidebar() {
             <div className="sidebar__user-plan">{user ? planText : radarHint}</div>
           </div>
         </Link>
+
+        <button type="button" className="sidebar__logout" onClick={handleLogout} disabled={loggingOut}>
+          {loggingOut ? 'Saindo...' : 'Sair do sistema'}
+        </button>
       </div>
     </aside>
   )

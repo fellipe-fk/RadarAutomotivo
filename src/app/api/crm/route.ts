@@ -21,6 +21,7 @@ const createCrmItemSchema = z.object({
 
 const updateCrmItemSchema = createCrmItemSchema.partial().extend({
   id: z.string().trim().min(1),
+  restore: z.boolean().optional(),
 })
 
 function normalizeOptional(value?: string) {
@@ -32,12 +33,55 @@ function isAuthError(error: unknown) {
   return error instanceof Error && /(autenticado|token|sessao|assinatura)/i.test(error.message)
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const user = await requireAuth(request)
+function buildStats(items: Array<{ status: CrmStatus; precoCompra: number | null; precoVenda: number | null }>) {
+  const invested = items
+    .filter((item) => item.status === CrmStatus.COMPRADO || item.status === CrmStatus.REVENDIDO)
+    .reduce((total, item) => total + (item.precoCompra || 0), 0)
 
-    const items = await prisma.crmItem.findMany({
-      where: { userId: user.id },
+  const sold = items
+    .filter((item) => item.status === CrmStatus.REVENDIDO)
+    .reduce((total, item) => total + (item.precoVenda || Math.round((item.precoCompra || 0) * 1.12)), 0)
+
+  const soldCost = items
+    .filter((item) => item.status === CrmStatus.REVENDIDO)
+    .reduce((total, item) => total + (item.precoCompra || 0), 0)
+
+  const profit = sold - soldCost
+
+  return {
+    total: items.length,
+    interesse: items.filter((item) => item.status === CrmStatus.INTERESSE).length,
+    negociando: items.filter((item) => item.status === CrmStatus.NEGOCIANDO).length,
+    comprado: items.filter((item) => item.status === CrmStatus.COMPRADO).length,
+    revendidos: items.filter((item) => item.status === CrmStatus.REVENDIDO).length,
+    falhas: items.filter((item) => item.status === CrmStatus.FALHA_NEGOCIACAO).length,
+    invested,
+    sold,
+    profit,
+  }
+}
+
+async function updateItem(request: NextRequest) {
+  const user = await requireAuth(request)
+  const body = await request.json()
+  const data = updateCrmItemSchema.parse(body)
+
+  const item = await prisma.crmItem.findFirst({
+    where: {
+      id: data.id,
+      userId: user.id,
+      ...(data.restore ? {} : { deletedAt: null }),
+    },
+  })
+
+  if (!item) {
+    return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 })
+  }
+
+  if (data.restore) {
+    const restored = await prisma.crmItem.update({
+      where: { id: item.id },
+      data: { deletedAt: null },
       include: {
         listing: {
           select: {
@@ -45,35 +89,92 @@ export async function GET(request: NextRequest) {
             title: true,
             price: true,
             sourceUrl: true,
+            deletedAt: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json({ item: restored })
+  }
+
+  if (data.listingId) {
+    const listing = await prisma.listing.findFirst({
+      where: {
+        id: data.listingId,
+        userId: user.id,
+        deletedAt: null,
+      },
+    })
+
+    if (!listing) {
+      return NextResponse.json({ error: 'Listagem nao encontrada' }, { status: 404 })
+    }
+  }
+
+  const updatedItem = await prisma.crmItem.update({
+    where: { id: item.id },
+    data: {
+      listingId: data.listingId !== undefined ? normalizeOptional(data.listingId) : undefined,
+      title: data.title,
+      precoCompra: data.precoCompra,
+      precoVenda: data.precoVenda,
+      status: data.status,
+      notes: data.notes !== undefined ? normalizeOptional(data.notes) : undefined,
+      plate: data.plate !== undefined ? normalizeOptional(data.plate) : undefined,
+      year: data.year,
+      mileage: data.mileage,
+    },
+    include: {
+      listing: {
+        select: {
+          id: true,
+          title: true,
+          price: true,
+          sourceUrl: true,
+        },
+      },
+    },
+  })
+
+  return NextResponse.json({ item: updatedItem })
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireAuth(request)
+    const trashView = request.nextUrl.searchParams.get('view') === 'trash'
+
+    const items = await prisma.crmItem.findMany({
+      where: {
+        userId: user.id,
+        deletedAt: trashView ? { not: null } : null,
+      },
+      include: {
+        listing: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            sourceUrl: true,
+            deletedAt: true,
           },
         },
       },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     })
 
-    const invested = items
-      .filter((item) => item.status === CrmStatus.COMPRADO || item.status === CrmStatus.REVENDIDO)
-      .reduce((total, item) => total + (item.precoCompra || 0), 0)
-
-    const sold = items
-      .filter((item) => item.status === CrmStatus.REVENDIDO)
-      .reduce((total, item) => total + (item.precoVenda || Math.round((item.precoCompra || 0) * 1.12)), 0)
-
-    const soldCost = items
-      .filter((item) => item.status === CrmStatus.REVENDIDO)
-      .reduce((total, item) => total + (item.precoCompra || 0), 0)
+    const stats = buildStats(items)
 
     return NextResponse.json({
       items,
-      stats: {
-        total: items.length,
-        interesse: items.filter((item) => item.status === CrmStatus.INTERESSE).length,
-        negociando: items.filter((item) => item.status === CrmStatus.NEGOCIANDO).length,
-        comprado: items.filter((item) => item.status === CrmStatus.COMPRADO).length,
-        revendidos: items.filter((item) => item.status === CrmStatus.REVENDIDO).length,
-        invested,
-        sold,
-        profit: sold - soldCost,
+      stats,
+      financial: {
+        investido: stats.invested,
+        revendido: stats.sold,
+        lucro: stats.profit,
+        negociando: stats.negociando,
+        totalItens: stats.total,
       },
     })
   } catch (error) {
@@ -97,6 +198,7 @@ export async function POST(request: NextRequest) {
         where: {
           id: data.listingId,
           userId: user.id,
+          deletedAt: null,
         },
       })
 
@@ -134,13 +236,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ item }, { status: 201 })
   } catch (error) {
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        {
-          error: 'Dados invalidos',
-          details: error.flatten(),
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Dados invalidos', details: error.flatten() }, { status: 400 })
     }
 
     if (isAuthError(error)) {
@@ -154,69 +250,10 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await requireAuth(request)
-    const body = await request.json()
-    const data = updateCrmItemSchema.parse(body)
-
-    const item = await prisma.crmItem.findFirst({
-      where: {
-        id: data.id,
-        userId: user.id,
-      },
-    })
-
-    if (!item) {
-      return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 })
-    }
-
-    if (data.listingId) {
-      const listing = await prisma.listing.findFirst({
-        where: {
-          id: data.listingId,
-          userId: user.id,
-        },
-      })
-
-      if (!listing) {
-        return NextResponse.json({ error: 'Listagem nao encontrada' }, { status: 404 })
-      }
-    }
-
-    const updatedItem = await prisma.crmItem.update({
-      where: { id: item.id },
-      data: {
-        listingId: data.listingId !== undefined ? normalizeOptional(data.listingId) : undefined,
-        title: data.title,
-        precoCompra: data.precoCompra,
-        precoVenda: data.precoVenda,
-        status: data.status,
-        notes: data.notes !== undefined ? normalizeOptional(data.notes) : undefined,
-        plate: data.plate !== undefined ? normalizeOptional(data.plate) : undefined,
-        year: data.year,
-        mileage: data.mileage,
-      },
-      include: {
-        listing: {
-          select: {
-            id: true,
-            title: true,
-            price: true,
-            sourceUrl: true,
-          },
-        },
-      },
-    })
-
-    return NextResponse.json({ item: updatedItem })
+    return await updateItem(request)
   } catch (error) {
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        {
-          error: 'Dados invalidos',
-          details: error.flatten(),
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Dados invalidos', details: error.flatten() }, { status: 400 })
     }
 
     if (isAuthError(error)) {
@@ -225,5 +262,45 @@ export async function PATCH(request: NextRequest) {
 
     console.error('Erro ao atualizar CRM:', error)
     return NextResponse.json({ error: 'Erro ao atualizar CRM' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  return PATCH(request)
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireAuth(request)
+    const { id } = (await request.json()) as { id?: string }
+
+    if (!id || typeof id !== 'string') {
+      return NextResponse.json({ error: 'ID obrigatorio' }, { status: 400 })
+    }
+
+    const item = await prisma.crmItem.findFirst({
+      where: {
+        id,
+        userId: user.id,
+        deletedAt: null,
+      },
+    })
+
+    if (!item) {
+      return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 })
+    }
+
+    await prisma.crmItem.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    })
+    return NextResponse.json({ ok: true, trashed: true })
+  } catch (error) {
+    if (isAuthError(error)) {
+      return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+    }
+
+    console.error('Erro ao remover item do CRM:', error)
+    return NextResponse.json({ error: 'Erro ao remover item do CRM' }, { status: 500 })
   }
 }

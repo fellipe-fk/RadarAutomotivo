@@ -5,6 +5,7 @@ export type ListingStatus = 'PENDING' | 'ANALYZED' | 'ALERTED' | 'DISCARDED'
 export interface Listing {
   id: string
   createdAt: string
+  deletedAt?: string | null
   title: string
   description?: string
   price: number

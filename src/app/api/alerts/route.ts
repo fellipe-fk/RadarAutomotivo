@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
           userId: user.id,
           status: 'ANALYZED',
           isDiscarded: false,
+          deletedAt: null,
         },
         orderBy: [{ createdAt: 'desc' }],
       }),
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest) {
         where: {
           userId: user.id,
           isDiscarded: false,
+          deletedAt: null,
         },
         select: {
           id: true,

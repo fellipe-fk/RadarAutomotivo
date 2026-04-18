@@ -4,7 +4,7 @@
   "crons": [
     {
       "path": "/api/radar/auto-scan",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 13 * * *"
     }
   ]
 }

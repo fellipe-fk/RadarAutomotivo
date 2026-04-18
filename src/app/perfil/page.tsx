@@ -58,6 +58,7 @@ export default function PerfilPage() {
   const [ui, setUi] = useState<ProfileUiState>(defaultUiState)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
 
@@ -199,6 +200,23 @@ export default function PerfilPage() {
     }
   }
 
+  async function handleLogout() {
+    if (loggingOut) return
+
+    setLoggingOut(true)
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
+    } catch (error) {
+      console.error(error)
+    } finally {
+      window.location.assign('/login')
+    }
+  }
+
   if (loading) {
     return (
       <div className="app-layout" data-page-id="perfil">
@@ -232,9 +250,14 @@ export default function PerfilPage() {
             <p className="page-subtitle">Personalize sua conta e preferencias</p>
           </div>
 
-          <button type="button" className="btn btn-primary" onClick={saveProfile} disabled={saving}>
-            {saving ? 'Salvando...' : 'Salvar alteracoes'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="button" className="btn" onClick={handleLogout} disabled={loggingOut}>
+              {loggingOut ? 'Saindo...' : 'Sair do sistema'}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={saveProfile} disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar alteracoes'}
+            </button>
+          </div>
         </div>
 
         {feedback ? <div className="panel-muted" style={{ marginBottom: 16 }}>{feedback}</div> : null}

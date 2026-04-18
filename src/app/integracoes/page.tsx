@@ -15,7 +15,10 @@ type SystemStatus = {
   telegramConfigured: boolean
   whatsappConfigured: boolean
   fipeConfigured: boolean
-  asaasConfigured: boolean
+  abacatepayConfigured: boolean
+  abacatepayWebhookConfigured: boolean
+  abacatepayReady: boolean
+  publicAppConfigured: boolean
   emailConfigured: boolean
   mapsConfigured: boolean
   laudoConfigured: boolean
@@ -79,11 +82,11 @@ export default function IntegracoesPage() {
         action: system?.mapsConfigured ? 'Ativo' : 'Em breve',
       },
       {
-        icon: 'AS',
-        name: 'Asaas cobranca',
-        description: 'Gestao de assinatura, cobrancas e cancelamentos.',
-        on: !!system?.asaasConfigured && user?.assinaturaStatus !== 'ENCERRADA',
-        action: system?.asaasConfigured ? 'Configurado' : 'Servidor',
+        icon: 'AB',
+        name: 'AbacatePay pagamentos',
+        description: 'Checkout de assinatura, cobrancas recorrentes e webhooks do plano.',
+        on: !!system?.abacatepayReady && user?.assinaturaStatus !== 'ENCERRADA',
+        action: system?.abacatepayReady ? 'Configurado' : 'Ajustar',
       },
       {
         icon: 'EM',
@@ -103,7 +106,9 @@ export default function IntegracoesPage() {
       },
     ],
     [
-      system?.asaasConfigured,
+      system?.abacatepayConfigured,
+      system?.abacatepayReady,
+      system?.abacatepayWebhookConfigured,
       system?.emailConfigured,
       system?.fipeConfigured,
       system?.laudoConfigured,
@@ -149,6 +154,16 @@ export default function IntegracoesPage() {
               </button>
             </div>
           ))}
+        </div>
+
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-title">Checklist de producao</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div className="panel-muted">URL publica: {system?.publicAppConfigured ? 'ok' : 'pendente'}</div>
+            <div className="panel-muted">AbacatePay API key: {system?.abacatepayConfigured ? 'ok' : 'pendente'}</div>
+            <div className="panel-muted">AbacatePay webhook secret: {system?.abacatepayWebhookConfigured ? 'ok' : 'pendente'}</div>
+            <div className="panel-muted">Billing pronto para checkout real: {system?.abacatepayReady ? 'sim' : 'nao'}</div>
+          </div>
         </div>
       </main>
     </div>

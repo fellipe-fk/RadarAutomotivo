@@ -8,11 +8,6 @@ type AnalyzeFormProps = {
   onAnalyzed?: () => void
 }
 
-type SystemStatus = {
-  aiProvider: string
-  aiConfigured: boolean
-}
-
 const acceptedSources = ['OLX', 'Facebook', 'Webmotors', 'iCarros', 'Mercado Livre', 'Kavak']
 const analysisSteps = [
   'Acessando o anuncio...',
@@ -25,6 +20,7 @@ const analysisSteps = [
 function detectSource(url: string) {
   const normalized = url.toLowerCase()
 
+  if (normalized.includes('olxpro') || normalized.includes('seminovos')) return 'OLX Pro detectado'
   if (normalized.includes('olx')) return 'OLX detectado'
   if (normalized.includes('facebook')) return 'Facebook Marketplace detectado'
   if (normalized.includes('webmotors')) return 'Webmotors detectado'
@@ -42,7 +38,9 @@ function scoreColor(score: number) {
 }
 
 export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
-  const [form, setForm] = useState({
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [showManual, setShowManual] = useState(false)
+  const [manualForm, setManualForm] = useState({
     type: 'MOTO',
     title: '',
     description: '',
@@ -50,37 +48,11 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
     mileage: '',
     year: '',
     city: '',
-    sourceUrl: '',
   })
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState('')
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
-  const [showManual, setShowManual] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-
-  useEffect(() => {
-    async function fetchSystemStatus() {
-      try {
-        const response = await fetch('/api/system/status')
-        const data = await response.json()
-
-        if (response.ok) {
-          setSystemStatus({
-            aiProvider: data.aiProvider || 'OpenAI',
-            aiConfigured: !!data.aiConfigured,
-          })
-        } else {
-          setSystemStatus({ aiProvider: 'OpenAI', aiConfigured: false })
-        }
-      } catch (fetchError) {
-        console.error(fetchError)
-        setSystemStatus({ aiProvider: 'OpenAI', aiConfigured: false })
-      }
-    }
-
-    fetchSystemStatus()
-  }, [])
 
   useEffect(() => {
     if (!loading) {
@@ -95,21 +67,18 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
     return () => window.clearInterval(timer)
   }, [loading])
 
-  const providerLabel = useMemo(() => detectSource(form.sourceUrl), [form.sourceUrl])
+  const providerLabel = useMemo(() => detectSource(sourceUrl), [sourceUrl])
+  const canSubmitUrl = !!sourceUrl.trim() && /^https?:\/\//i.test(sourceUrl.trim())
+  const canSubmitManual = !!manualForm.title.trim() && !!manualForm.price
 
-  async function handleSubmit() {
-    if (!systemStatus?.aiConfigured) {
-      setError('A IA do sistema ainda nao foi configurada no servidor.')
+  async function handleSubmit(mode: 'url' | 'manual') {
+    if (mode === 'url' && !canSubmitUrl) {
+      setError('Cole um link valido para analisar o anuncio automaticamente.')
       return
     }
 
-    if (!form.sourceUrl && !form.title && !form.description) {
-      setError('Preencha um link ou informe manualmente os dados principais.')
-      return
-    }
-
-    if (!form.sourceUrl && !form.price) {
-      setError('Informe o preco pedido para calcular score e margem.')
+    if (mode === 'manual' && !canSubmitManual) {
+      setError('Preencha pelo menos titulo e preco para a analise manual.')
       return
     }
 
@@ -117,11 +86,26 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
     setError('')
     setResult(null)
 
+    const payload =
+      mode === 'url'
+        ? {
+            sourceUrl: sourceUrl.trim(),
+          }
+        : {
+            type: manualForm.type,
+            title: manualForm.title,
+            description: manualForm.description,
+            price: manualForm.price,
+            mileage: manualForm.mileage,
+            year: manualForm.year,
+            city: manualForm.city,
+          }
+
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
@@ -131,6 +115,7 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
       }
 
       setResult(data.analysis)
+      if (mode === 'url') setSourceUrl('')
       onAnalyzed?.()
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Falha ao analisar anuncio.')
@@ -144,56 +129,30 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
 
   return (
     <div className="analyze-form">
-      {systemStatus?.aiConfigured === false ? (
-        <div className="analyze-warning">
-          <strong>Servico de analise indisponivel</strong> no momento.
-          <div className="analyze-warning__hint">Tente novamente em instantes ou use o preenchimento manual.</div>
-        </div>
-      ) : (
-        <div className="panel-muted" style={{ marginBottom: 16 }}>
-          {systemStatus ? 'Preparado para analisar o anuncio no backend.' : 'Validando conexao com o servico de analise...'}
-        </div>
-      )}
-
       <div className="analyze-link-card">
-        <div className="analyze-link-card__title">Link do anuncio</div>
+        <div className="analyze-link-card__title">Cole o link do anuncio</div>
 
         <div className="analyze-link-row">
           <input
             type="url"
             placeholder="https://www.olx.com.br/... | facebook.com/marketplace/... | webmotors.com.br/..."
-            value={form.sourceUrl}
-            onChange={(event) => setForm({ ...form, sourceUrl: event.target.value })}
+            value={sourceUrl}
+            onChange={(event) => setSourceUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && canSubmitUrl && !loading) {
+                handleSubmit('url')
+              }
+            }}
           />
-          <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={loading || !form.sourceUrl}>
+          <button type="button" className="btn btn-primary" onClick={() => handleSubmit('url')} disabled={loading || !canSubmitUrl}>
             Analisar
           </button>
-        </div>
-
-        <div className="form-grid form-grid--2" style={{ marginBottom: providerLabel ? 10 : 0 }}>
-          <div>
-            <label className="form-label">Tipo</label>
-            <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
-              <option value="MOTO">Moto</option>
-              <option value="CARRO">Carro</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="form-label">Preco pedido (R$)</label>
-            <input
-              type="number"
-              placeholder="21900"
-              value={form.price}
-              onChange={(event) => setForm({ ...form, price: event.target.value })}
-            />
-          </div>
         </div>
 
         {providerLabel ? (
           <div className="analyze-provider">
             <span>OK</span>
-            <span>{providerLabel}</span>
+            <span>{providerLabel} - o sistema tenta extrair preco, km, ano e cidade automaticamente.</span>
           </div>
         ) : null}
 
@@ -209,7 +168,7 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
 
       <div className="analyze-manual-toggle">
         <button type="button" onClick={() => setShowManual((current) => !current)}>
-          {showManual ? 'Ocultar preenchimento manual' : 'Preenchimento manual'}
+          {showManual ? 'Ocultar preenchimento manual' : 'Nao tenho link - quero preencher manualmente'}
         </button>
       </div>
 
@@ -219,13 +178,11 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
 
           <div className="form-grid form-grid--2" style={{ marginBottom: 10 }}>
             <div>
-              <label className="form-label">Titulo do anuncio</label>
-              <input
-                type="text"
-                placeholder="Honda XRE 300 2021"
-                value={form.title}
-                onChange={(event) => setForm({ ...form, title: event.target.value })}
-              />
+              <label className="form-label">Tipo</label>
+              <select value={manualForm.type} onChange={(event) => setManualForm({ ...manualForm, type: event.target.value })}>
+                <option value="MOTO">Moto</option>
+                <option value="CARRO">Carro</option>
+              </select>
             </div>
 
             <div>
@@ -233,20 +190,30 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
               <input
                 type="text"
                 placeholder="Campinas SP"
-                value={form.city}
-                onChange={(event) => setForm({ ...form, city: event.target.value })}
+                value={manualForm.city}
+                onChange={(event) => setManualForm({ ...manualForm, city: event.target.value })}
               />
             </div>
           </div>
 
+          <div style={{ marginBottom: 10 }}>
+            <label className="form-label">Titulo do anuncio</label>
+            <input
+              type="text"
+              placeholder="Honda XRE 300 2021"
+              value={manualForm.title}
+              onChange={(event) => setManualForm({ ...manualForm, title: event.target.value })}
+            />
+          </div>
+
           <div className="form-grid form-grid--3" style={{ marginBottom: 10 }}>
             <div>
-              <label className="form-label">Ano</label>
+              <label className="form-label">Preco pedido (R$)</label>
               <input
                 type="number"
-                placeholder="2021"
-                value={form.year}
-                onChange={(event) => setForm({ ...form, year: event.target.value })}
+                placeholder="21900"
+                value={manualForm.price}
+                onChange={(event) => setManualForm({ ...manualForm, price: event.target.value })}
               />
             </div>
 
@@ -255,18 +222,18 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
               <input
                 type="number"
                 placeholder="38000"
-                value={form.mileage}
-                onChange={(event) => setForm({ ...form, mileage: event.target.value })}
+                value={manualForm.mileage}
+                onChange={(event) => setManualForm({ ...manualForm, mileage: event.target.value })}
               />
             </div>
 
             <div>
-              <label className="form-label">Preco pedido (R$)</label>
+              <label className="form-label">Ano</label>
               <input
                 type="number"
-                placeholder="21900"
-                value={form.price}
-                onChange={(event) => setForm({ ...form, price: event.target.value })}
+                placeholder="2021"
+                value={manualForm.year}
+                onChange={(event) => setManualForm({ ...manualForm, year: event.target.value })}
               />
             </div>
           </div>
@@ -276,13 +243,19 @@ export default function AnalyzeForm({ onAnalyzed }: AnalyzeFormProps) {
             <textarea
               rows={4}
               placeholder="Cole aqui o titulo e a descricao completa do anuncio."
-              value={form.description}
-              onChange={(event) => setForm({ ...form, description: event.target.value })}
+              value={manualForm.description}
+              onChange={(event) => setManualForm({ ...manualForm, description: event.target.value })}
               style={{ resize: 'vertical' }}
             />
           </div>
 
-          <button type="button" className="btn btn-primary analyze-form__submit" style={{ marginTop: 14 }} onClick={handleSubmit} disabled={loading}>
+          <button
+            type="button"
+            className="btn btn-primary analyze-form__submit"
+            style={{ marginTop: 14 }}
+            onClick={() => handleSubmit('manual')}
+            disabled={loading || !canSubmitManual}
+          >
             Analisar com IA
           </button>
         </div>

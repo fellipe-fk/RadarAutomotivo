@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
 import { normalizeRadarConfig } from '@/lib/radar'
-import { processUrl } from '@/lib/radar-auto-scan'
+import { processDirectResult, processUrl } from '@/lib/radar-auto-scan'
+import { searchFreeSources } from '@/lib/scan-sources'
+
+export const dynamic = 'force-dynamic'
 
 function isCronAuthorized(request: NextRequest) {
   const authHeader = request.headers.get('authorization') || ''
@@ -14,7 +17,7 @@ function isCronAuthorized(request: NextRequest) {
 
 async function getLastListingDate(userId: string) {
   const lastListing = await prisma.listing.findFirst({
-    where: { userId },
+    where: { userId, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     select: { createdAt: true },
   })
@@ -64,6 +67,7 @@ export async function GET(request: NextRequest) {
       }
 
       const normalizedConfig = normalizeRadarConfig(config)
+      const scanType = normalizedConfig.tipo === 'MOTO' || normalizedConfig.tipo === 'CARRO' ? normalizedConfig.tipo : 'TODOS'
       const lastListingAt = await getLastListingDate(user.id)
       const frequenciaMs = (config.frequenciaMin || 60) * 60 * 1000
       const elapsed = lastListingAt ? Date.now() - lastListingAt.getTime() : Infinity
@@ -77,20 +81,38 @@ export async function GET(request: NextRequest) {
       summary.usersProcessed += 1
 
       const manualUrls = Array.from(new Set((config.seedUrls || []).map((u) => u.trim()).filter(Boolean))).slice(0, 20)
-      const userResults: Array<{ url: string; title?: string; status: string; detail: string }> = []
+      const directResultsMap = new Map<string, Awaited<ReturnType<typeof searchFreeSources>>['directResults'][number]>()
+      const discoveredUrls: string[] = []
 
-      for (const sourceUrl of manualUrls) {
+      if (normalizedConfig.modelos.length > 0 && normalizedConfig.fontes.length > 0) {
+        for (const modelo of normalizedConfig.modelos.slice(0, 3)) {
+          const { directResults, linkUrls } = await searchFreeSources(modelo, scanType, normalizedConfig.fontes)
+
+          for (const result of directResults) {
+            directResultsMap.set(result.url, result)
+          }
+
+          discoveredUrls.push(...linkUrls)
+        }
+      }
+
+      for (const result of Array.from(directResultsMap.values()).slice(0, 30)) {
         try {
-          const result = await processUrl(sourceUrl, user.id, normalizedConfig)
-          summary.listingsProcessed += result.item.status === 'skipped' ? 0 : 1
-          if (result.alerted) summary.alertsTriggered += 1
-          userResults.push(result.item)
-        } catch (error) {
-          userResults.push({
-            url: sourceUrl,
-            status: 'skipped',
-            detail: error instanceof Error ? error.message : 'Falha ao processar URL',
-          })
+          const processed = await processDirectResult(result, user.id, normalizedConfig, scanType === 'TODOS' ? 'CARRO' : scanType)
+          summary.listingsProcessed += processed.item.status === 'skipped' ? 0 : 1
+          if (processed.alerted) summary.alertsTriggered += 1
+        } catch {
+          continue
+        }
+      }
+
+      for (const sourceUrl of Array.from(new Set([...manualUrls, ...discoveredUrls])).slice(0, 30)) {
+        try {
+          const processed = await processUrl(sourceUrl, user.id, normalizedConfig)
+          summary.listingsProcessed += processed.item.status === 'skipped' ? 0 : 1
+          if (processed.alerted) summary.alertsTriggered += 1
+        } catch {
+          continue
         }
       }
 

@@ -31,16 +31,16 @@ const painPoints = [
 
 const steps = [
   {
-    title: 'Configure o radar',
-    description: 'Defina modelos, preco maximo, quilometragem, distancia, risco e margem minima.',
+    title: 'Escolha o plano',
+    description: 'A landing leva para um checkout unico de teste, sem criar conta antes da hora.',
   },
   {
-    title: 'A IA analisa',
-    description: 'O sistema cruza descricao, preco, sinais de risco e referencia de mercado para priorizar o que vale.',
+    title: 'Pague no checkout',
+    description: 'A AbacatePay confirma o pagamento e redireciona voce para a tela de confirmacao do fluxo.',
   },
   {
-    title: 'Receba e aja rapido',
-    description: 'Quando bater nos seus criterios, a oportunidade aparece pronta para decisao no painel e nos alertas.',
+    title: 'Crie o acesso',
+    description: 'So depois do pagamento confirmado o cadastro abre, e a conta ja nasce com o plano liberado.',
   },
 ]
 
@@ -55,23 +55,11 @@ const features = [
 
 const plans = [
   {
-    name: 'Basico',
-    price: 'R$ 97',
-    description: 'Entrada para operar com criterio e receber alertas essenciais.',
-    items: ['30 analises por mes', 'Radar em 1 regiao', 'Alerta no Telegram'],
-  },
-  {
-    name: 'Pro',
+    name: 'Plano de teste',
     price: 'R$ 197',
-    description: 'Melhor equilibrio para revendedor que quer velocidade e controle.',
+    description: 'Fluxo unico para validar cadastro, checkout e webhook da AbacatePay com menos ruido.',
     items: ['Analises ilimitadas', 'Radar multi-regiao', 'CRM, calculadora e analytics'],
     featured: true,
-  },
-  {
-    name: 'Agencia',
-    price: 'R$ 497',
-    description: 'Estrutura para operacao maior, equipe e monitoramento ampliado.',
-    items: ['Tudo do Pro', 'Ate 5 usuarios', 'Relatorios e operacao ampliada'],
   },
 ]
 
@@ -79,7 +67,7 @@ const faqs = [
   {
     question: 'Como funciona o trial?',
     answer:
-      'Voce cria a conta, escolhe um plano e pode testar o sistema com 7 dias de uso para validar o fluxo.',
+      'Para o teste atual, voce escolhe o plano, paga no checkout, confirma o pagamento e so depois cria a conta.',
   },
   {
     question: 'O RadarAuto ja analisa anuncios reais?',
@@ -114,7 +102,7 @@ export default async function HomePage() {
 
           <nav className="marketing-links">
             <a href="#funcionalidades">Funcionalidades</a>
-            <a href="#planos">Planos</a>
+            <a href="#planos">Plano</a>
             <a href="#faq">FAQ</a>
           </nav>
 
@@ -122,7 +110,7 @@ export default async function HomePage() {
             <Link href="/login" className="btn">
               Entrar
             </Link>
-            <Link href="/cadastro" className="btn btn-primary">
+            <Link href="/checkout?plan=PRO" className="btn btn-primary">
               Testar gratis
             </Link>
           </div>
@@ -141,8 +129,8 @@ export default async function HomePage() {
             </p>
 
             <div className="marketing-hero__actions">
-              <Link href="/cadastro" className="btn btn-primary">
-                Comecar teste gratis
+              <Link href="/checkout?plan=PRO" className="btn btn-primary">
+                Ir para o checkout
               </Link>
               <Link href="/login" className="btn marketing-btn--light">
                 Entrar no sistema
@@ -255,12 +243,12 @@ export default async function HomePage() {
         <section className="marketing-section marketing-section--muted" id="planos">
           <div className="marketing-container">
             <div className="marketing-heading">
-              <span className="marketing-label">Planos</span>
-              <h2>Simples para comecar, forte para escalar</h2>
-              <p>Escolha o nivel de operacao que faz sentido para voce agora.</p>
+              <span className="marketing-label">Plano</span>
+              <h2>Um plano unico, uma operacao mais clara</h2>
+              <p>Padronizamos o produto em um unico plano para simplificar cobranca, onboarding e suporte sem ruido desnecessario.</p>
             </div>
 
-            <div className="marketing-grid marketing-grid--3">
+            <div className="marketing-grid" style={{ gridTemplateColumns: 'minmax(280px, 420px)', justifyContent: 'center' }}>
               {plans.map((plan) => (
                 <article
                   key={plan.name}
@@ -277,8 +265,8 @@ export default async function HomePage() {
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
-                  <Link href="/cadastro" className={`btn ${plan.featured ? 'btn-primary' : ''}`}>
-                    Comecar agora
+                  <Link href="/checkout?plan=PRO" className={`btn ${plan.featured ? 'btn-primary' : ''}`}>
+                    Ir para o checkout
                   </Link>
                 </article>
               ))}
@@ -307,10 +295,10 @@ export default async function HomePage() {
         <section className="marketing-cta">
           <div className="marketing-container marketing-container--narrow">
             <h2>Pronto para continuar a evolucao do RadarAuto?</h2>
-            <p>Comece pelo fluxo de cadastro e entre no painel para acompanhar a proxima fase do produto.</p>
+            <p>Comece pelo checkout, confirme o pagamento e so depois crie a conta para entrar no painel.</p>
             <div className="marketing-hero__actions">
-              <Link href="/cadastro" className="btn btn-primary">
-                Criar conta
+              <Link href="/checkout?plan=PRO" className="btn btn-primary">
+                Comecar checkout
               </Link>
               <Link href="/login" className="btn marketing-btn--light">
                 Ja tenho conta

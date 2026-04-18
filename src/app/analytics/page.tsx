@@ -66,8 +66,9 @@ export default function AnalyticsPage() {
 
   const analytics = useMemo(() => {
     const radarListings = listings.filter((listing) => matchesRadar(listing, config))
-    const totalMargin = radarListings.reduce((total, listing) => total + safeNumber(listing.estimatedMargin), 0)
-    const avgMargin = radarListings.length > 0 ? totalMargin / radarListings.length : 0
+    const positiveListings = radarListings.filter((listing) => safeNumber(listing.estimatedMargin) > 0)
+    const totalMargin = positiveListings.reduce((total, listing) => total + safeNumber(listing.estimatedMargin), 0)
+    const avgMargin = positiveListings.length > 0 ? totalMargin / positiveListings.length : 0
     const opportunityRate = listings.length > 0 ? Math.round((radarListings.length / listings.length) * 100) : 0
 
     const days = Array.from({ length: 7 }).map((_, index) => {

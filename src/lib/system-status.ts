@@ -1,4 +1,5 @@
 import { getLaudoProviderStatus } from '@/lib/laudo'
+import { isAbacatePayConfigured } from '@/lib/abacatepay'
 
 function hasValue(value?: string) {
   return typeof value === 'string' && value.trim().length > 0
@@ -11,6 +12,9 @@ export function getSystemOpenAiApiKey() {
 export function getSystemStatus() {
   const openAiConfigured = hasValue(getSystemOpenAiApiKey())
   const laudoStatus = getLaudoProviderStatus()
+  const publicAppConfigured = hasValue(process.env.NEXT_PUBLIC_APP_URL)
+  const abacatepayWebhookConfigured = hasValue(process.env.ABACATEPAY_WEBHOOK_SECRET)
+  const abacatepayConfigured = isAbacatePayConfigured()
 
   return {
     aiProvider: 'OpenAI',
@@ -19,11 +23,14 @@ export function getSystemStatus() {
     telegramConfigured: hasValue(process.env.TELEGRAM_BOT_TOKEN),
     whatsappConfigured: hasValue(process.env.WHATSAPP_TOKEN) && hasValue(process.env.WHATSAPP_PHONE_ID),
     fipeConfigured: hasValue(process.env.FIPE_API_URL),
-    asaasConfigured: hasValue(process.env.ASAAS_API_KEY),
+    abacatepayConfigured,
+    abacatepayWebhookConfigured,
+    abacatepayReady: abacatepayConfigured && abacatepayWebhookConfigured && publicAppConfigured,
+    asaasConfigured: false,
     emailConfigured: false,
     mapsConfigured: false,
     laudoConfigured: laudoStatus.configured,
     laudoProviderName: laudoStatus.configured ? laudoStatus.providerName : 'Triagem automatica interna',
-    publicAppConfigured: hasValue(process.env.NEXT_PUBLIC_APP_URL),
+    publicAppConfigured,
   }
 }

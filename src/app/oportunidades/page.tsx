@@ -104,6 +104,11 @@ export default function OportunidadesPage() {
           <div className="dashboard-card__empty">
             <div className="empty-state__icon">?</div>
             <div style={{ marginBottom: 10 }}>Nenhum anuncio passou nos seus filtros.</div>
+            {config.tipo !== 'TODOS' ? (
+              <div className="section-title__hint" style={{ marginBottom: 10 }}>
+                Seu radar esta filtrando apenas {config.tipo.toLowerCase()}. Se quiser ampliar, altere o tipo para Todos.
+              </div>
+            ) : null}
             <Link href="/radar" prefetch={false} className="btn btn-primary">
               Ajustar radar
             </Link>

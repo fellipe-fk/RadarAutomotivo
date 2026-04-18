@@ -61,7 +61,13 @@ export async function POST(req: NextRequest) {
     const resolvedPrice = parseNumberish(price) ?? extracted?.price
     const resolvedMileage = parseNumberish(mileage) ?? extracted?.mileage
     const resolvedYear = parseNumberish(year) ?? extracted?.year
-    const resolvedTitle = manualTitle || extracted?.title || `${type} anunciado`
+    const resolvedType =
+      type === 'MOTO' || type === 'CARRO'
+        ? type
+        : extracted?.detectedVehicleType === 'MOTO' || extracted?.detectedVehicleType === 'CARRO'
+          ? extracted.detectedVehicleType
+          : null
+    const resolvedTitle = manualTitle || extracted?.title || `${resolvedType || 'Veiculo'} anunciado`
     const resolvedDescription = manualDescription || extracted?.description
     const resolvedCity = manualCity || extracted?.city
     const resolvedImageUrls =
@@ -72,8 +78,8 @@ export async function POST(req: NextRequest) {
       extracted?.source || (cleanSourceUrl.includes('facebook') ? 'facebook' : cleanSourceUrl.includes('olx') ? 'olx' : 'manual')
     const resolvedSourceUrl = extracted?.resolvedUrl || cleanSourceUrl || undefined
 
-    if (!type) {
-      return NextResponse.json({ error: 'Tipo do veiculo e obrigatorio.' }, { status: 400 })
+    if (!resolvedType) {
+      return NextResponse.json({ error: 'Nao foi possivel identificar o tipo do veiculo. Preencha manualmente.' }, { status: 400 })
     }
 
     if (!cleanSourceUrl && !manualTitle && !manualDescription) {
@@ -93,7 +99,7 @@ export async function POST(req: NextRequest) {
         title: resolvedTitle,
         description: resolvedDescription,
         price: resolvedPrice,
-        type,
+        type: resolvedType,
         source: resolvedSource,
         sourceUrl: resolvedSourceUrl,
         imageUrls: resolvedImageUrls,
@@ -108,7 +114,7 @@ export async function POST(req: NextRequest) {
     })
 
     const analyzeInput = {
-      type,
+      type: resolvedType,
       title: resolvedTitle,
       description: resolvedDescription,
       price: resolvedPrice,

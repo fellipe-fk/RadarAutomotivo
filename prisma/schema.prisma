@@ -21,12 +21,12 @@ model User {
   raioKm               Int               @default(120)
   consumoKmL           Float             @default(12)
   avatarUrl            String?
-  plano                Plano             @default(BASICO)
+  plano                Plano             @default(PRO)
   assinaturaStatus     AssinaturaStatus  @default(TRIAL)
   trialEndsAt          DateTime?
   assinaturaEndsAt     DateTime?
-  asaasCustomerId      String?
-  asaasSubscriptionId  String?
+  abacatepayCustomerId      String?
+  abacatepaySubscriptionId  String?
   creditosLaudo        Int               @default(3)
   telegramChatId       String?
   telegramEnabled      Boolean           @default(false)
@@ -58,6 +58,7 @@ model Listing {
   id                 String        @id @default(cuid())
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
   userId             String
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title              String
@@ -132,6 +133,7 @@ model CrmItem {
   id           String    @id @default(cuid())
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   listingId    String?   @unique
@@ -163,16 +165,22 @@ model Laudo {
 }
 
 model Pagamento {
-  id              String   @id @default(cuid())
-  createdAt       DateTime @default(now())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  valor           Float
-  descricao       String
-  status          String
-  asaasId         String?  @unique
-  asaasPaymentId  String?
-  tipo            String
+  id                   String   @id @default(cuid())
+  createdAt            DateTime @default(now())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  valor                Float
+  descricao            String
+  status               String
+  tipo                 String
+  externalReferenceId  String?
+  billingEvent         String?
+  abacatepayId         String?  @unique
+  abacatepayPaymentId  String?
+
+  @@index([userId, tipo, createdAt])
+  @@index([externalReferenceId])
+  @@index([abacatepayPaymentId])
 }
 
 model LoginAttempt {
@@ -253,4 +261,5 @@ enum CrmStatus {
   NEGOCIANDO
   COMPRADO
   REVENDIDO
+  FALHA_NEGOCIACAO
 }

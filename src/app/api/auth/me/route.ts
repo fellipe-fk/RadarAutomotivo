@@ -3,6 +3,7 @@ import { ZodError, z } from 'zod'
 
 import { auditLog, requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { inferSubscriptionState } from '@/lib/subscription-state'
 
 const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -45,6 +46,12 @@ function mapUserResponse(user: {
   margemMinima: number
   focoTipo: string
   telegramChatId: string | null
+  abacatepayCustomerId?: string | null
+  abacatepaySubscriptionId?: string | null
+}, billingState?: {
+  effectiveStatus: string
+  checkoutRequired: boolean
+  hasConfirmedBilling: boolean
 }) {
   return {
     id: user.id,
@@ -54,8 +61,11 @@ function mapUserResponse(user: {
     city: user.city,
     state: user.state,
     plano: user.plano,
-    assinaturaStatus: user.assinaturaStatus,
+    assinaturaStatus: billingState?.effectiveStatus || user.assinaturaStatus,
+    persistedAssinaturaStatus: user.assinaturaStatus,
     trialEndsAt: user.trialEndsAt,
+    checkoutRequired: billingState?.checkoutRequired || false,
+    hasConfirmedBilling: billingState?.hasConfirmedBilling || false,
     creditosLaudo: user.creditosLaudo,
     raioKm: user.raioKm,
     consumoKmL: user.consumoKmL,
@@ -72,11 +82,23 @@ function mapUserResponse(user: {
 export async function GET(request: NextRequest) {
   try {
     const authUser = await requireAuth(request)
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { id: authUser.id },
-    })
+    const [user, payments] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: authUser.id },
+      }),
+      prisma.pagamento.findMany({
+        where: {
+          userId: authUser.id,
+          tipo: 'ASSINATURA',
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+      }),
+    ])
 
-    return NextResponse.json({ user: mapUserResponse(user) })
+    const billingState = inferSubscriptionState(user, payments)
+
+    return NextResponse.json({ user: mapUserResponse(user, billingState) })
   } catch {
     return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
   }

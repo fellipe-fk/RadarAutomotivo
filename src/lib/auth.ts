@@ -31,7 +31,8 @@ export const registerSchema = z.object({
   phone: z.string().trim().min(10).max(20).optional().or(z.literal('')),
   city: z.string().trim().max(100).optional().or(z.literal('')),
   state: z.string().trim().length(2).optional().or(z.literal('')),
-  plano: z.enum(['BASICO', 'PRO', 'AGENCIA']).optional().default('PRO'),
+  plano: z.literal('PRO').optional().default('PRO'),
+  checkoutToken: z.string().trim().optional(),
 })
 
 export const loginSchema = z.object({

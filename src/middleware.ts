@@ -3,12 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 const protectedPrefixes = [
   '/dashboard',
   '/oportunidades',
+  '/favoritos',
   '/analisar',
   '/crm',
   '/calculadora',
   '/radar',
   '/analytics',
   '/alertas',
+  '/lixeira',
   '/laudo',
   '/integracoes',
   '/assinatura',
@@ -33,5 +35,22 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/oportunidades/:path*', '/analisar/:path*', '/crm/:path*', '/calculadora/:path*', '/radar/:path*', '/analytics/:path*', '/alertas/:path*', '/laudo/:path*', '/integracoes/:path*', '/assinatura/:path*', '/perfil/:path*', '/login', '/cadastro'],
+  matcher: [
+    '/dashboard/:path*',
+    '/oportunidades/:path*',
+    '/favoritos/:path*',
+    '/analisar/:path*',
+    '/crm/:path*',
+    '/calculadora/:path*',
+    '/radar/:path*',
+    '/analytics/:path*',
+    '/alertas/:path*',
+    '/lixeira/:path*',
+    '/laudo/:path*',
+    '/integracoes/:path*',
+    '/assinatura/:path*',
+    '/perfil/:path*',
+    '/login',
+    '/cadastro',
+  ],
 }

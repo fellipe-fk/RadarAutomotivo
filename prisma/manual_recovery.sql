@@ -38,12 +38,12 @@ CREATE TABLE IF NOT EXISTS "User" (
   "raioKm" INTEGER NOT NULL DEFAULT 120,
   "consumoKmL" DOUBLE PRECISION NOT NULL DEFAULT 12,
   "avatarUrl" TEXT,
-  "plano" "Plano" NOT NULL DEFAULT 'BASICO',
+  "plano" "Plano" NOT NULL DEFAULT 'PRO',
   "assinaturaStatus" "AssinaturaStatus" NOT NULL DEFAULT 'TRIAL',
   "trialEndsAt" TIMESTAMP(3),
   "assinaturaEndsAt" TIMESTAMP(3),
-  "asaasCustomerId" TEXT,
-  "asaasSubscriptionId" TEXT,
+  "abacatepayCustomerId" TEXT,
+  "abacatepaySubscriptionId" TEXT,
   "creditosLaudo" INTEGER NOT NULL DEFAULT 3,
   "telegramChatId" TEXT,
   "telegramEnabled" BOOLEAN NOT NULL DEFAULT false,
@@ -270,14 +270,19 @@ CREATE TABLE IF NOT EXISTS "Pagamento" (
   "valor" DOUBLE PRECISION NOT NULL,
   "descricao" TEXT NOT NULL,
   "status" TEXT NOT NULL,
-  "asaasId" TEXT,
-  "asaasPaymentId" TEXT,
+  "externalReferenceId" TEXT,
+  "billingEvent" TEXT,
+  "abacatepayId" TEXT,
+  "abacatepayPaymentId" TEXT,
   "tipo" TEXT NOT NULL,
   CONSTRAINT "Pagamento_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "Pagamento_asaasId_key" ON "Pagamento"("asaasId");
+CREATE UNIQUE INDEX IF NOT EXISTS "Pagamento_abacatepayId_key" ON "Pagamento"("abacatepayId");
 CREATE INDEX IF NOT EXISTS "Pagamento_userId_idx" ON "Pagamento"("userId");
+CREATE INDEX IF NOT EXISTS "Pagamento_externalReferenceId_idx" ON "Pagamento"("externalReferenceId");
+CREATE INDEX IF NOT EXISTS "Pagamento_abacatepayPaymentId_idx" ON "Pagamento"("abacatepayPaymentId");
+CREATE INDEX IF NOT EXISTS "Pagamento_userId_tipo_createdAt_idx" ON "Pagamento"("userId", "tipo", "createdAt");
 
 DO $$
 BEGIN

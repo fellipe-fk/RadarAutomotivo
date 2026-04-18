@@ -87,6 +87,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData()
+    const interval = window.setInterval(fetchDashboardData, 5 * 60 * 1000)
+    return () => window.clearInterval(interval)
   }, [])
 
   async function handleFavorite(id: string, value: boolean) {
@@ -110,11 +112,14 @@ export default function DashboardPage() {
   }
 
   const metrics = useMemo(() => {
+    const positiveListings = listings.filter((listing) => safeNumber(listing.estimatedMargin) > 0)
     const avgMargin =
-      listings.length > 0 ? listings.reduce((acc, listing) => acc + safeNumber(listing.estimatedMargin), 0) / listings.length : 0
+      positiveListings.length > 0
+        ? positiveListings.reduce((acc, listing) => acc + safeNumber(listing.estimatedMargin), 0) / positiveListings.length
+        : 0
 
     return {
-      radarListings: listings.filter(() => true),
+      radarListings: positiveListings.slice().sort((left, right) => (right.opportunityScore ?? 0) - (left.opportunityScore ?? 0)),
       avgMargin,
       latestScanAt: radarSummary.lastScanAt,
     }
