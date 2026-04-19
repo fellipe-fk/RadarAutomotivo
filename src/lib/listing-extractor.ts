@@ -276,6 +276,10 @@ function stripHtml(html: string) {
   )
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function detectSource(url: URL) {
   const host = url.hostname.toLowerCase()
   if (host.includes('olx')) return 'olx'
@@ -286,6 +290,98 @@ function detectSource(url: URL) {
   if (host.includes('kavak')) return 'kavak'
   if (host.includes('mobiauto')) return 'mobiauto'
   return host.replace(/^www\./, '')
+}
+
+function cleanupTitle(title: string, source: string) {
+  if (!title) return ''
+
+  const separators = [' | ', ' - ', ' — ']
+  let cleaned = normalizeWhitespace(title)
+
+  const sourceTokens = [source, 'webmotors', 'icarros', 'kavak', 'mercado livre', 'olx']
+
+  for (const separator of separators) {
+    const parts = cleaned.split(separator).map((part) => part.trim()).filter(Boolean)
+    if (parts.length < 2) continue
+
+    const relevant = parts.filter((part) => {
+      const normalized = normalizeText(part)
+      return !sourceTokens.some((token) => normalized === normalizeText(token))
+    })
+
+    if (relevant.length > 0) {
+      cleaned = relevant[0]
+      break
+    }
+  }
+
+  cleaned = cleaned
+    .replace(/\b(Webmotors|iCarros|Kavak|Mercado Livre|OLX)\b/gi, ' ')
+    .replace(/\b(compre|venda|seminovos|usados|estoque)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return cleaned
+}
+
+function extractH1Title(html: string) {
+  const match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+  return match?.[1] ? normalizeWhitespace(match[1]) : ''
+}
+
+function extractSourceSpecificTitle(source: string, html: string, rawText: string) {
+  const titleHints: string[] = []
+
+  const h1Title = extractH1Title(html)
+  if (h1Title) titleHints.push(h1Title)
+
+  if (source === 'webmotors') {
+    const patterns = [
+      /"vehicleTitle"\s*:\s*"([^"]+)"/i,
+      /"title"\s*:\s*"([^"]{8,160})"/i,
+      /\b\d{4}\s+[A-Za-z0-9][^\n|]{8,120}/,
+    ]
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern) || rawText.match(pattern)
+      if (match?.[1]) titleHints.push(match[1])
+      else if (match?.[0]) titleHints.push(match[0])
+    }
+  }
+
+  if (source === 'icarros') {
+    const patterns = [
+      /"modelDescription"\s*:\s*"([^"]+)"/i,
+      /"name"\s*:\s*"([^"]{8,160})"/i,
+      /\b\d{4}\s+[A-Za-z0-9][^\n|]{8,120}/,
+    ]
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern) || rawText.match(pattern)
+      if (match?.[1]) titleHints.push(match[1])
+      else if (match?.[0]) titleHints.push(match[0])
+    }
+  }
+
+  if (source === 'kavak') {
+    const patterns = [
+      /"seoTitle"\s*:\s*"([^"]+)"/i,
+      /"name"\s*:\s*"([^"]{8,160})"/i,
+      /\b\d{4}\s+[A-Za-z0-9][^\n|]{8,120}/,
+    ]
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern) || rawText.match(pattern)
+      if (match?.[1]) titleHints.push(match[1])
+      else if (match?.[0]) titleHints.push(match[0])
+    }
+  }
+
+  const cleaned = titleHints
+    .map((entry) => cleanupTitle(entry, source))
+    .find((entry) => entry.length >= 6)
+
+  return cleaned || ''
 }
 
 function isPrivateHostname(hostname: string) {
@@ -431,6 +527,20 @@ function extractTitle(html: string) {
   return ''
 }
 
+function extractJsonNumberValues(html: string, keys: string[]) {
+  const numbers: number[] = []
+
+  for (const key of keys) {
+    const pattern = new RegExp(`"${escapeRegExp(key)}"\\s*:\\s*("?)([\\d.,]+)\\1`, 'gi')
+    for (const match of Array.from(html.matchAll(pattern))) {
+      const parsed = toNumber(match[2] || '')
+      if (parsed) numbers.push(parsed)
+    }
+  }
+
+  return numbers
+}
+
 function extractJsonLd(html: string) {
   const blocks = Array.from(html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi))
 
@@ -489,15 +599,37 @@ function extractPrice(rawText: string, html: string, jsonLdItems: unknown[]) {
     if (parsed) return parsed
   }
 
+  const genericJsonPrices = extractJsonNumberValues(html, [
+    'price',
+    'priceValue',
+    'priceAmount',
+    'cashPrice',
+    'salePrice',
+    'offerPrice',
+    'listPrice',
+    'sellingPrice',
+    'amount',
+  ]).filter((value) => value >= 1500)
+
+  if (genericJsonPrices.length > 0) {
+    return genericJsonPrices.sort((left, right) => left - right)[0]
+  }
+
   const priceMatch = rawText.match(/R\$\s*([\d.\s]+(?:,\d{2})?)/i)
   if (priceMatch?.[1]) return toNumber(priceMatch[1])
+
+  const labeledPrice = rawText.match(/(?:preco|valor|por|a partir de)\s*:?\s*R\$\s*([\d.\s]+(?:,\d{2})?)/i)
+  if (labeledPrice?.[1]) return toNumber(labeledPrice[1])
 
   return undefined
 }
 
 function extractMileage(rawText: string) {
   const mileageMatch = rawText.match(/([\d.\s]{1,12})\s*(?:km|quilometr)/i)
-  return mileageMatch?.[1] ? toNumber(mileageMatch[1]) : undefined
+  if (mileageMatch?.[1]) return toNumber(mileageMatch[1])
+
+  const labeledMileage = rawText.match(/(?:quilometragem|km rodados|rodagem)\s*:?\s*([\d.\s]{1,12})/i)
+  return labeledMileage?.[1] ? toNumber(labeledMileage[1]) : undefined
 }
 
 function extractYear(rawText: string) {
@@ -506,6 +638,93 @@ function extractYear(rawText: string) {
     .filter((value) => value >= 1990 && value <= new Date().getFullYear() + 1)
 
   return yearMatches[0]
+}
+
+function extractSourceSpecificPrice(source: string, html: string, rawText: string) {
+  const keysBySource: Record<string, string[]> = {
+    webmotors: ['price', 'priceValue', 'vehiclePrice', 'priceAmount', 'cashPrice'],
+    icarros: ['price', 'priceValue', 'offerPrice', 'vehiclePrice'],
+    kavak: ['price', 'priceValue', 'salePrice', 'cashPrice', 'amount'],
+  }
+
+  const candidateKeys = keysBySource[source]
+  if (!candidateKeys) return undefined
+
+  const values = extractJsonNumberValues(html, candidateKeys).filter((value) => value >= 1500)
+  if (values.length > 0) {
+    return values.sort((left, right) => left - right)[0]
+  }
+
+  const rawMatch = rawText.match(/(?:preco|valor|por)\s*:?\s*R\$\s*([\d.\s]+(?:,\d{2})?)/i)
+  if (rawMatch?.[1]) {
+    return toNumber(rawMatch[1])
+  }
+
+  return undefined
+}
+
+function extractSourceSpecificMileage(source: string, html: string, rawText: string) {
+  const patternsBySource: Record<string, RegExp[]> = {
+    webmotors: [/"mileage"\s*:\s*("?)([\d.,]+)\1/i, /quilometragem\s*:?\s*([\d.\s]{1,12})/i],
+    icarros: [/"mileage"\s*:\s*("?)([\d.,]+)\1/i, /km rodados\s*:?\s*([\d.\s]{1,12})/i],
+    kavak: [/"mileage"\s*:\s*("?)([\d.,]+)\1/i, /kilometragem\s*:?\s*([\d.\s]{1,12})/i],
+  }
+
+  const patterns = patternsBySource[source] || []
+  for (const pattern of patterns) {
+    const match = html.match(pattern) || rawText.match(pattern)
+    const candidate = match?.[2] || match?.[1]
+    if (candidate) {
+      const parsed = toNumber(candidate)
+      if (parsed) return parsed
+    }
+  }
+
+  return undefined
+}
+
+function extractSourceSpecificYear(source: string, html: string, rawText: string) {
+  const patternsBySource: Record<string, RegExp[]> = {
+    webmotors: [/"modelYear"\s*:\s*("?)(19\d{2}|20\d{2})\1/i, /ano(?: modelo)?\s*:?\s*(19\d{2}|20\d{2})/i],
+    icarros: [/"modelYear"\s*:\s*("?)(19\d{2}|20\d{2})\1/i, /ano(?: modelo)?\s*:?\s*(19\d{2}|20\d{2})/i],
+    kavak: [/"modelYear"\s*:\s*("?)(19\d{2}|20\d{2})\1/i, /ano(?: modelo)?\s*:?\s*(19\d{2}|20\d{2})/i],
+  }
+
+  const patterns = patternsBySource[source] || []
+  for (const pattern of patterns) {
+    const match = html.match(pattern) || rawText.match(pattern)
+    const candidate = match?.[2] || match?.[1]
+    if (candidate) {
+      const parsed = Number(candidate)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+
+  return undefined
+}
+
+function extractSourceSpecificLocation(source: string, html: string, rawText: string) {
+  const patternsBySource: Record<string, RegExp[]> = {
+    webmotors: [/([A-Z][A-Za-zÀ-ÿ\s]+)\s*-\s*([A-Z]{2})/],
+    icarros: [/([A-Z][A-Za-zÀ-ÿ\s]+)\s*-\s*([A-Z]{2})/],
+    kavak: [/([A-Z][A-Za-zÀ-ÿ\s]+)\s*-\s*([A-Z]{2})/],
+  }
+
+  const patterns = patternsBySource[source] || []
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern) || html.match(pattern)
+    if (match?.[1] && match?.[2]) {
+      return {
+        city: normalizeWhitespace(match[1]),
+        state: normalizeWhitespace(match[2]),
+      }
+    }
+  }
+
+  return {
+    city: undefined,
+    state: undefined,
+  }
 }
 
 function extractLocation(html: string, rawText: string, jsonLdItems: unknown[]) {
@@ -549,6 +768,46 @@ function deriveBrandModel(title: string) {
     brand: parts[0],
     model: parts.slice(1, 3).join(' '),
   }
+}
+
+function looksLikeSearchOrCatalogPage(params: {
+  url: URL
+  title: string
+  description: string
+  rawText: string
+}) {
+  const path = params.url.pathname.toLowerCase()
+  const search = params.url.search.toLowerCase()
+  const combined = normalizeText(`${params.title} ${params.description} ${params.rawText.slice(0, 1200)}`)
+
+  const pathLooksLikeSearch =
+    search.includes('busca=') ||
+    search.includes('q=') ||
+    search.includes('palavra=') ||
+    path.includes('/estoque') ||
+    path.includes('/lista') ||
+    path.includes('/busca') ||
+    path.includes('/seminovos')
+
+  const textLooksLikeSearch = [
+    'carros usados no brasil',
+    'veiculos a venda',
+    'carros seminovos',
+    'resultados da busca',
+    'catalogo',
+    'estoque',
+    'refine sua busca',
+    'filtros',
+    'ordenar por',
+  ].some((token) => combined.includes(token))
+
+  const lacksListingSignals =
+    !/r\$\s*[\d.\s]+(?:,\d{2})?/i.test(params.rawText) &&
+    !combined.includes('ano') &&
+    !combined.includes('km') &&
+    !combined.includes('quilometr')
+
+  return pathLooksLikeSearch || (textLooksLikeSearch && lacksListingSignals)
 }
 
 async function tryExtractViaJina(url: string): Promise<{ html: string; rawText: string; title: string } | null> {
@@ -619,9 +878,24 @@ export async function extractListingFromUrl(sourceUrl: string): Promise<Extracte
   }
 
   const finalParsedUrl = new URL(finalUrl)
+  const source = detectSource(finalParsedUrl)
   const jsonLdItems = extractJsonLd(html)
-  const title = extractTitle(html) || ''
+  const title = extractSourceSpecificTitle(source, html, rawText) || extractTitle(html) || ''
   const description = extractMetaContent(html, 'description') || extractMetaContent(html, 'og:description') || rawText.slice(0, 300)
+
+  if (
+    looksLikeSearchOrCatalogPage({
+      url: finalParsedUrl,
+      title,
+      description,
+      rawText,
+    })
+  ) {
+    throw new Error(
+      'Este link parece ser pagina de busca ou vitrine da plataforma, nao um anuncio individual. Abra o anuncio especifico e tente novamente.'
+    )
+  }
+
   const vehicleCheck = checkIsVehicle({
     url: finalParsedUrl,
     title,
@@ -635,14 +909,17 @@ export async function extractListingFromUrl(sourceUrl: string): Promise<Extracte
 
   const detectedVehicleType = 'vehicleType' in vehicleCheck ? vehicleCheck.vehicleType : null
 
-  const price = extractPrice(rawText, html, jsonLdItems)
-  const mileage = extractMileage(rawText)
-  const year = extractYear(`${title} ${rawText}`)
-  const { city, state } = extractLocation(html, rawText, jsonLdItems)
+  const price = extractSourceSpecificPrice(source, html, rawText) || extractPrice(rawText, html, jsonLdItems)
+  const mileage = extractSourceSpecificMileage(source, html, rawText) || extractMileage(rawText)
+  const year = extractSourceSpecificYear(source, html, rawText) || extractYear(`${title} ${rawText}`)
+  const sourceLocation = extractSourceSpecificLocation(source, html, rawText)
+  const location = extractLocation(html, rawText, jsonLdItems)
+  const city = sourceLocation.city || location.city
+  const state = sourceLocation.state || location.state
   const derived = deriveBrandModel(title)
 
   return {
-    source: detectSource(finalParsedUrl),
+    source,
     resolvedUrl: finalUrl,
     title: title || undefined,
     description: description || undefined,

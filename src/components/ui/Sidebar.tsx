@@ -121,6 +121,17 @@ const systemItems: NavItem[] = [
     ),
   },
   {
+    href: '/radar/monitoramento',
+    label: 'Monitoramento',
+    id: 'radar-monitoramento',
+    icon: iconNode(
+      <>
+        <path d="M2 12h2l2-4 2 2 3-5 3 7h2" />
+        <path d="M2 14h12" />
+      </>
+    ),
+  },
+  {
     href: '/analytics',
     label: 'Analytics',
     id: 'analytics',
@@ -205,6 +216,7 @@ function formatPlan(plano?: string) {
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const safePathname = pathname || ''
   const [user, setUser] = useState<SidebarUser | null>(null)
   const [config, setConfig] = useState<RadarConfig | null>(null)
   const [opportunityCount, setOpportunityCount] = useState(0)
@@ -245,7 +257,7 @@ export default function Sidebar() {
   }, [])
 
   const isActive = (href: string, id: string) =>
-    pathname === href || pathname === `/${id}` || pathname.startsWith(`${href}/`)
+    safePathname === href || safePathname === `/${id}` || safePathname.startsWith(`${href}/`)
 
   const initials = useMemo(() => {
     const name = user?.name || 'Radar Auto'

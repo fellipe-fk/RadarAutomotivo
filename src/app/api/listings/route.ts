@@ -42,10 +42,34 @@ export async function GET(req: NextRequest) {
 
     const listings = await prisma.listing.findMany({
       where,
+      include: {
+        alerts: {
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+          select: {
+            createdAt: true,
+            sent: true,
+            errorMsg: true,
+          },
+        },
+        reviewDecision: {
+          select: {
+            status: true,
+            note: true,
+            decidedAt: true,
+          },
+        },
+      },
       orderBy: [{ opportunityScore: 'desc' }, { createdAt: 'desc' }],
     })
 
-    return NextResponse.json({ listings })
+    return NextResponse.json({
+      listings: listings.map(({ alerts, reviewDecision, ...listing }) => ({
+        ...listing,
+        latestAlert: alerts[0] || null,
+        reviewDecision: reviewDecision || null,
+      })),
+    })
   } catch (error) {
     if (isAuthError(error)) {
       return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })

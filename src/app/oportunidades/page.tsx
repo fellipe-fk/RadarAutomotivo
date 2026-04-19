@@ -58,6 +58,20 @@ export default function OportunidadesPage() {
   }
 
   const visibleListings = useMemo(() => listings.filter((listing) => matchesRadar(listing, config)), [config, listings])
+  const opportunityStats = useMemo(() => {
+    const sent = visibleListings.filter((listing) => listing.alertSent).length
+    const suppressed = visibleListings.filter((listing) => !listing.alertSent && Boolean(listing.latestAlert && !listing.latestAlert.sent)).length
+    const highConfidence = visibleListings.filter((listing) =>
+      listing.positiveSignals.some((signal) => signal.toLowerCase().includes('confianca'))
+    ).length
+
+    return {
+      total: visibleListings.length,
+      sent,
+      suppressed,
+      highConfidence,
+    }
+  }, [visibleListings])
 
   const filterChips = useMemo(() => {
     const chips = [`Score >= ${config.scoreAlerta}`, `Risco <= ${formatRiskLabel(config.riscoMax)}`, `Raio ${config.distanciaMax} km`]
@@ -97,6 +111,32 @@ export default function OportunidadesPage() {
             </span>
           ))}
         </div>
+
+        <section className="card" style={{ marginTop: 18 }}>
+          <div className="card-title">Leitura rapida das oportunidades</div>
+          <div className="radar-config-grid">
+            <div className="radar-config-item">
+              <label>Oportunidades visiveis</label>
+              <div style={{ fontWeight: 700 }}>{opportunityStats.total}</div>
+              <div className="section-title__hint">passaram no radar atual</div>
+            </div>
+            <div className="radar-config-item">
+              <label>Alertadas</label>
+              <div style={{ fontWeight: 700 }}>{opportunityStats.sent}</div>
+              <div className="section-title__hint">ja enviadas automaticamente</div>
+            </div>
+            <div className="radar-config-item">
+              <label>Seguradas</label>
+              <div style={{ fontWeight: 700 }}>{opportunityStats.suppressed}</div>
+              <div className="section-title__hint">alerta bloqueado por politica ou throttle</div>
+            </div>
+            <div className="radar-config-item">
+              <label>Com confianca alta</label>
+              <div style={{ fontWeight: 700 }}>{opportunityStats.highConfidence}</div>
+              <div className="section-title__hint">score com boa sustentacao heuristica</div>
+            </div>
+          </div>
+        </section>
 
         {loading ? <div className="dashboard-card__empty">Carregando oportunidades...</div> : null}
 

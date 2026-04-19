@@ -1,5 +1,6 @@
 export type RadarConfigLike = {
   ativo?: boolean
+  autoScanEnabled?: boolean
   modelos?: string[]
   fontes?: string[]
   seedUrls?: string[]
@@ -13,6 +14,8 @@ export type RadarConfigLike = {
   margemMin?: number
   frequenciaMin?: number
   scoreAlerta?: number
+  lastScanAt?: Date | string | null
+  nextScanAt?: Date | string | null
 }
 
 export type RadarListingLike = {
@@ -41,8 +44,9 @@ export type RadarListingLike = {
 
 export const DEFAULT_RADAR_CONFIG: Required<RadarConfigLike> = {
   ativo: true,
+  autoScanEnabled: true,
   modelos: ['XRE 300', 'CB 500', 'Fazer 250'],
-  fontes: ['olx', 'facebook', 'webmotors'],
+  fontes: ['mercadolivre', 'olx', 'manual'],
   seedUrls: [],
   tipo: 'TODOS',
   precoMax: 35000,
@@ -54,6 +58,8 @@ export const DEFAULT_RADAR_CONFIG: Required<RadarConfigLike> = {
   margemMin: 1500,
   frequenciaMin: 60,
   scoreAlerta: 75,
+  lastScanAt: null,
+  nextScanAt: null,
 }
 
 export function safeNumber(value: number | undefined | null) {
@@ -110,8 +116,13 @@ export function formatRiskLabel(value?: string) {
 
 export function formatSourceLabel(value: string) {
   if (value === 'olx') return 'OLX'
+  if (value === 'olxpro') return 'OLX Pro'
   if (value === 'facebook') return 'Facebook'
   if (value === 'webmotors') return 'Webmotors'
+  if (value === 'mercadolivre') return 'Mercado Livre'
+  if (value === 'icarros') return 'iCarros'
+  if (value === 'kavak') return 'Kavak'
+  if (value === 'queroquero') return 'Quero-Quero'
   if (value === 'manual') return 'Manual'
   return value
 }

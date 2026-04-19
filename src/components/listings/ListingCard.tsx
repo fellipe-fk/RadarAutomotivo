@@ -28,6 +28,27 @@ function riskLabel(level?: string) {
   return 'Alto'
 }
 
+function formatRelativeTime(value?: string | null) {
+  if (!value) return 'agora'
+
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return 'agora'
+
+  const diffMinutes = Math.max(1, Math.round((Date.now() - timestamp) / 60000))
+  if (diffMinutes < 60) return `ha ${diffMinutes} min`
+
+  const diffHours = Math.round(diffMinutes / 60)
+  if (diffHours < 24) return `ha ${diffHours} h`
+
+  const diffDays = Math.round(diffHours / 24)
+  return `ha ${diffDays} dia${diffDays > 1 ? 's' : ''}`
+}
+
+function formatAlertError(error?: string | null) {
+  if (!error) return null
+  return error.replace(/^Suprimido:\s*/i, '')
+}
+
 export default function ListingCard({ listing, onFavorite, onDiscard, compact }: Props) {
   const opportunityScore = listing.opportunityScore ?? 0
   const opportunityColor = scoreColor(opportunityScore)
@@ -44,6 +65,8 @@ export default function ListingCard({ listing, onFavorite, onDiscard, compact }:
   const isRadarMatch = opportunityScore >= 75
   const mediaLabel = listing.type === 'MOTO' ? 'Moto' : 'Carro'
   const mediaImage = listing.imageUrls?.[0]
+  const latestAlertReason = formatAlertError(listing.latestAlert?.errorMsg)
+  const suppressedAlert = Boolean(listing.latestAlert && !listing.latestAlert.sent && latestAlertReason)
 
   return (
     <article className={`listing-card ${isRadarMatch ? 'listing-card--match' : ''}`}>
@@ -67,6 +90,7 @@ export default function ListingCard({ listing, onFavorite, onDiscard, compact }:
                 <span className="badge">{listing.type === 'MOTO' ? 'Moto' : 'Carro'}</span>
                 <span className="badge badge--muted">{listing.source.toUpperCase()}</span>
                 {listing.alertSent ? <span className="badge badge--success">Alerta enviado</span> : null}
+                {!listing.alertSent && suppressedAlert ? <span className="badge">Alerta segurado</span> : null}
                 {listing.isFavorite ? <span className="badge badge--purple">Favorito</span> : null}
               </div>
             </div>
@@ -128,6 +152,15 @@ export default function ListingCard({ listing, onFavorite, onDiscard, compact }:
                 {signal}
               </span>
             ))}
+          </div>
+        ) : null}
+
+        {!listing.alertSent && suppressedAlert ? (
+          <div className="panel-muted" style={{ marginBottom: 0 }}>
+            <strong>Alerta nao enviado automaticamente.</strong> {latestAlertReason}
+            <div className="section-title__hint" style={{ marginTop: 6 }}>
+              Ultima decisao {formatRelativeTime(listing.latestAlert?.createdAt)}
+            </div>
           </div>
         ) : null}
 

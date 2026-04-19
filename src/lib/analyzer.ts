@@ -307,9 +307,6 @@ Retorne o JSON exatamente no schema solicitado.`
     body: JSON.stringify({
       model: OPENAI_MODEL,
       input: prompt,
-      reasoning: {
-        effort: 'medium',
-      },
       text: {
         format: {
           type: 'json_schema',
@@ -343,6 +340,22 @@ Retorne o JSON exatamente no schema solicitado.`
 export function getAnalysisFailureMessage(error: unknown) {
   const message = error instanceof Error ? error.message : 'Falha na analise.'
   const normalized = normalizeText(message)
+
+  if (normalized.includes('fetch failed') || normalized.includes('network') || normalized.includes('timeout')) {
+    return 'falha de rede ao acessar OpenAI'
+  }
+
+  if (normalized.includes('invalid api key') || normalized.includes('incorrect api key') || normalized.includes('authentication')) {
+    return 'chave invalida da OpenAI'
+  }
+
+  if (normalized.includes('model_not_found') || normalized.includes('does not exist')) {
+    return 'modelo da OpenAI indisponivel ou invalido'
+  }
+
+  if (normalized.includes('unsupported parameter')) {
+    return 'payload incompatível com o modelo configurado'
+  }
 
   if (normalized.includes('credit balance is too low') || normalized.includes('purchase credits') || normalized.includes('insufficient_quota')) {
     return 'saldo insuficiente no provedor de IA'

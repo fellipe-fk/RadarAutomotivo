@@ -12,7 +12,8 @@ export async function runAnalysisWithFallback(input: AnalyzeInput) {
     return { analysis, fallbackReason: null as string | null }
   } catch (analysisError) {
     const fallbackReason = getAnalysisFailureMessage(analysisError)
-    console.warn('IA principal indisponivel, usando analise local:', fallbackReason)
+    const originalMessage = analysisError instanceof Error ? analysisError.message : String(analysisError)
+    console.warn('IA principal indisponivel, usando analise local:', fallbackReason, '| detalhe:', originalMessage)
     const analysis = await analyzeAdLocally(input, fallbackReason)
     return { analysis, fallbackReason }
   }

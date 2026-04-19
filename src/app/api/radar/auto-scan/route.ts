@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
-import { normalizeRadarConfig } from '@/lib/radar'
-import { processDirectResult, processUrl } from '@/lib/radar-auto-scan'
-import { searchFreeSources } from '@/lib/scan-sources'
+import { executeRadarScan } from '@/lib/scanner/services/scan-orchestrator'
+import { ensureNextScanAt, isRadarScanDue } from '@/lib/scanner/services/schedule-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,16 +12,6 @@ function isCronAuthorized(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET?.trim()
 
   return Boolean(token && cronSecret && token === cronSecret)
-}
-
-async function getLastListingDate(userId: string) {
-  const lastListing = await prisma.listing.findFirst({
-    where: { userId, deletedAt: null },
-    orderBy: { createdAt: 'desc' },
-    select: { createdAt: true },
-  })
-
-  return lastListing?.createdAt || null
 }
 
 export async function GET(request: NextRequest) {
@@ -36,6 +25,7 @@ export async function GET(request: NextRequest) {
         radarConfig: {
           is: {
             ativo: true,
+            autoScanEnabled: true,
           },
         },
       },
@@ -66,55 +56,29 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const normalizedConfig = normalizeRadarConfig(config)
-      const scanType = normalizedConfig.tipo === 'MOTO' || normalizedConfig.tipo === 'CARRO' ? normalizedConfig.tipo : 'TODOS'
-      const lastListingAt = await getLastListingDate(user.id)
-      const frequenciaMs = (config.frequenciaMin || 60) * 60 * 1000
-      const elapsed = lastListingAt ? Date.now() - lastListingAt.getTime() : Infinity
-
-      if (elapsed < frequenciaMs) {
+      const nextScanAt = ensureNextScanAt(config)
+      if (!isRadarScanDue(config)) {
         summary.usersSkipped += 1
-        results.push({ userId: user.id, processed: false, reason: 'Fora da janela de frequencia' })
+        results.push({
+          userId: user.id,
+          processed: false,
+          reason: nextScanAt ? `Proximo scan em ${nextScanAt.toISOString()}` : 'Auto scan desabilitado',
+        })
         continue
       }
 
       summary.usersProcessed += 1
 
-      const manualUrls = Array.from(new Set((config.seedUrls || []).map((u) => u.trim()).filter(Boolean))).slice(0, 20)
-      const directResultsMap = new Map<string, Awaited<ReturnType<typeof searchFreeSources>>['directResults'][number]>()
-      const discoveredUrls: string[] = []
+      const result = await executeRadarScan({
+        userId: user.id,
+        radarConfigId: config.id,
+        config,
+        mode: 'auto',
+        includeSearchPageFallback: false,
+      })
 
-      if (normalizedConfig.modelos.length > 0 && normalizedConfig.fontes.length > 0) {
-        for (const modelo of normalizedConfig.modelos.slice(0, 3)) {
-          const { directResults, linkUrls } = await searchFreeSources(modelo, scanType, normalizedConfig.fontes)
-
-          for (const result of directResults) {
-            directResultsMap.set(result.url, result)
-          }
-
-          discoveredUrls.push(...linkUrls)
-        }
-      }
-
-      for (const result of Array.from(directResultsMap.values()).slice(0, 30)) {
-        try {
-          const processed = await processDirectResult(result, user.id, normalizedConfig, scanType === 'TODOS' ? 'CARRO' : scanType)
-          summary.listingsProcessed += processed.item.status === 'skipped' ? 0 : 1
-          if (processed.alerted) summary.alertsTriggered += 1
-        } catch {
-          continue
-        }
-      }
-
-      for (const sourceUrl of Array.from(new Set([...manualUrls, ...discoveredUrls])).slice(0, 30)) {
-        try {
-          const processed = await processUrl(sourceUrl, user.id, normalizedConfig)
-          summary.listingsProcessed += processed.item.status === 'skipped' ? 0 : 1
-          if (processed.alerted) summary.alertsTriggered += 1
-        } catch {
-          continue
-        }
-      }
+      summary.listingsProcessed += result.summary.analyzed
+      summary.alertsTriggered += result.summary.alerted
 
       results.push({ userId: user.id, processed: true })
     }

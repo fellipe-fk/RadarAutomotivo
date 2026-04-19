@@ -43,6 +43,8 @@ model User {
   sessions             Session[]
   pagamentos           Pagamento[]
   auditLogs            AuditLog[]
+  scanRuns             ScanRun[]
+  reviewDecisions      ListingReviewDecision[]
 }
 
 model Session {
@@ -92,6 +94,23 @@ model Listing {
   isDiscarded        Boolean       @default(false)
   alerts             Alert[]
   crmItem            CrmItem?
+  snapshots          ListingSnapshot[]
+  reviewDecision     ListingReviewDecision?
+}
+
+model ListingReviewDecision {
+  id          String               @id @default(cuid())
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId   String               @unique
+  listing     Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  status      ReviewDecisionStatus
+  note        String?
+  decidedAt   DateTime             @default(now())
+
+  @@index([userId, status, decidedAt])
 }
 
 model RadarConfig {
@@ -100,6 +119,7 @@ model RadarConfig {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt      DateTime @updatedAt
   ativo          Boolean  @default(true)
+  autoScanEnabled Boolean @default(true)
   modelos        String[] @default(["XRE 300", "CB 500", "Fazer 250"])
   fontes         String[] @default(["olx", "facebook", "webmotors"])
   seedUrls       String[] @default([])
@@ -113,6 +133,9 @@ model RadarConfig {
   margemMin      Float    @default(1500)
   frequenciaMin  Int      @default(60)
   scoreAlerta    Int      @default(75)
+  lastScanAt     DateTime?
+  nextScanAt     DateTime?
+  scanRuns       ScanRun[]
 }
 
 model Alert {
@@ -223,6 +246,72 @@ model SecurityLog {
   @@index([event, createdAt])
 }
 
+model ScanRun {
+  id            String          @id
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  radarConfigId String?
+  radarConfig   RadarConfig?    @relation(fields: [radarConfigId], references: [id], onDelete: SetNull)
+  status        String
+  mode          String?
+  startedAt     DateTime        @default(now())
+  finishedAt    DateTime?
+  totalFound    Int             @default(0)
+  totalNew      Int             @default(0)
+  totalUpdated  Int             @default(0)
+  totalFailed   Int             @default(0)
+  diagnostics   Json?
+  sourceRuns    ScanSourceRun[]
+  snapshots     ListingSnapshot[]
+
+  @@index([userId, startedAt])
+  @@index([radarConfigId, startedAt])
+  @@index([status, startedAt])
+}
+
+model ScanSourceRun {
+  id          String   @id @default(cuid())
+  scanRunId   String
+  scanRun     ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+  source      String
+  status      String
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  found       Int      @default(0)
+  imported    Int      @default(0)
+  updated     Int      @default(0)
+  failed      Int      @default(0)
+  errorMsg    String?
+  diagnostics Json?
+
+  @@index([scanRunId, source])
+  @@index([source, startedAt])
+}
+
+model ListingSnapshot {
+  id               String    @id @default(cuid())
+  listingId        String
+  listing          Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  scanRunId        String?
+  scanRun          ScanRun?  @relation(fields: [scanRunId], references: [id], onDelete: SetNull)
+  capturedAt       DateTime  @default(now())
+  price            Int?
+  title            String?
+  city             String?
+  state            String?
+  year             Int?
+  mileage          Int?
+  opportunityScore Int?
+  riskScore        Int?
+  marginAmount     Int?
+  marginPercent    Float?
+  status           String?
+  rawPayload       Json?
+
+  @@index([listingId, capturedAt])
+  @@index([scanRunId, capturedAt])
+}
+
 enum VehicleType {
   MOTO
   CARRO
@@ -262,4 +351,9 @@ enum CrmStatus {
   COMPRADO
   REVENDIDO
   FALHA_NEGOCIACAO
+}
+
+enum ReviewDecisionStatus {
+  APPROVED
+  REJECTED
 }

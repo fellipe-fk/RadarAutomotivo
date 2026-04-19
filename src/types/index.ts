@@ -2,6 +2,18 @@ export type VehicleType = 'MOTO' | 'CARRO'
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
 export type ListingStatus = 'PENDING' | 'ANALYZED' | 'ALERTED' | 'DISCARDED'
 
+export interface ListingAlertContext {
+  createdAt: string
+  sent: boolean
+  errorMsg?: string | null
+}
+
+export interface ListingReviewContext {
+  status: 'APPROVED' | 'REJECTED'
+  note?: string | null
+  decidedAt: string
+}
+
 export interface Listing {
   id: string
   createdAt: string
@@ -33,6 +45,8 @@ export interface Listing {
   alertSent: boolean
   isFavorite: boolean
   isDiscarded: boolean
+  latestAlert?: ListingAlertContext | null
+  reviewDecision?: ListingReviewContext | null
 }
 
 export interface AnalysisResult {

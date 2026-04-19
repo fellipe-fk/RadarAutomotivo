@@ -31,7 +31,7 @@ function formatMoney(value: number) {
 
 export default function RegisterForm() {
   const searchParams = useSearchParams()
-  const checkoutToken = searchParams.get('checkoutToken') || ''
+  const checkoutToken = searchParams?.get('checkoutToken') || ''
   const [checkoutState, setCheckoutState] = useState<CheckoutState | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(Boolean(checkoutToken))
   const [checkoutError, setCheckoutError] = useState('')
@@ -189,6 +189,12 @@ export default function RegisterForm() {
     )
   }
 
+  if (!checkoutState) {
+    return null
+  }
+
+  const confirmedCheckoutState = checkoutState
+
   return (
     <div className="auth-page">
       <div className="auth-card auth-card--wide">
@@ -199,7 +205,7 @@ export default function RegisterForm() {
         </div>
 
         <div className="panel-muted" style={{ marginBottom: 18 }}>
-          <strong>{planCopy}</strong> | {formatMoney(checkoutState.checkout.amount)} | status {checkoutState.checkout.status}
+          <strong>{planCopy}</strong> | {formatMoney(confirmedCheckoutState.checkout.amount)} | status {confirmedCheckoutState.checkout.status}
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -296,7 +302,7 @@ export default function RegisterForm() {
             <div className="auth-plan-grid">
               <div className="auth-plan is-selected">
                 <strong>{planCopy}</strong>
-                <span>{formatMoney(checkoutState.checkout.amount)}</span>
+                <span>{formatMoney(confirmedCheckoutState.checkout.amount)}</span>
                 <small style={{ display: 'block', marginTop: 8, color: '#6c7785' }}>
                   Sua conta vai nascer com este plano ja validado pelo checkout.
                 </small>

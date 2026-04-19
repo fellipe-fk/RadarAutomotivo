@@ -18,11 +18,78 @@ const sourceOptions = [
   { value: 'manual', label: 'Manual' },
 ]
 
-function formatRelativeTime(value?: string) {
+const CAR_ONLY_SOURCES = new Set(['webmotors', 'icarros', 'kavak', 'queroquero'])
+const PARTIAL_AUTOMATION_SOURCES = new Set(['facebook', 'manual', 'queroquero'])
+
+type RadarRunStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED'
+
+type RadarSourceRun = {
+  id: string
+  source: string
+  status: 'COMPLETED' | 'PARTIAL' | 'FAILED'
+  found: number
+  imported: number
+  updated: number
+  failed: number
+  startedAt: string
+  finishedAt?: string | null
+  diagnostics?: Array<Record<string, unknown>>
+}
+
+type RadarRun = {
+  id: string
+  status: RadarRunStatus
+  mode?: string | null
+  startedAt: string
+  finishedAt?: string | null
+  totalFound: number
+  totalNew: number
+  totalUpdated: number
+  totalFailed: number
+  sourceRuns: RadarSourceRun[]
+}
+
+type RadarSourceHealth = {
+  source: string
+  totalRuns: number
+  completed: number
+  partial: number
+  failed: number
+  successRate: number
+  avgFound: number
+  lastFinishedAt?: string | null
+}
+
+type RadarSnapshot = {
+  id: string
+  capturedAt: string
+  price?: number | null
+  title?: string | null
+  city?: string | null
+  state?: string | null
+  opportunityScore?: number | null
+  riskScore?: number | null
+  status?: string | null
+  listing: {
+    id: string
+    title: string
+    source: string
+    sourceUrl?: string | null
+    status: string
+  }
+  scanRun?: {
+    id: string
+    status: string
+    startedAt: string
+    finishedAt?: string | null
+    mode?: string | null
+  } | null
+}
+
+function formatRelativeTime(value?: string | Date | null) {
   if (!value) return 'agora'
 
   const timestamp = new Date(value).getTime()
-
   if (Number.isNaN(timestamp)) return 'agora'
 
   const diffMinutes = Math.max(1, Math.round((Date.now() - timestamp) / 60000))
@@ -30,11 +97,90 @@ function formatRelativeTime(value?: string) {
   if (diffMinutes < 60) return `ha ${diffMinutes} min`
 
   const diffHours = Math.round(diffMinutes / 60)
-
   if (diffHours < 24) return `ha ${diffHours} h`
 
   const diffDays = Math.round(diffHours / 24)
   return `ha ${diffDays} dia${diffDays > 1 ? 's' : ''}`
+}
+
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return 'Nao agendado'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Nao agendado'
+
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatRunStatus(status?: string | null) {
+  if (status === 'COMPLETED') return 'Concluido'
+  if (status === 'PARTIAL') return 'Parcial'
+  if (status === 'FAILED') return 'Falhou'
+  if (status === 'RUNNING') return 'Rodando'
+  if (status === 'QUEUED') return 'Na fila'
+  return status || 'Desconhecido'
+}
+
+function getRunTone(status?: string | null) {
+  if (status === 'COMPLETED') return '#1f8f4e'
+  if (status === 'PARTIAL') return '#b7791f'
+  if (status === 'FAILED') return '#c53030'
+  if (status === 'RUNNING') return '#2563eb'
+  return '#718096'
+}
+
+function formatSourceLabel(value: string) {
+  if (value === 'mercadolivre') return 'Mercado Livre'
+  if (value === 'webmotors') return 'Webmotors'
+  if (value === 'icarros') return 'iCarros'
+  if (value === 'kavak') return 'Kavak'
+  if (value === 'queroquero') return 'Quero-Quero'
+  return value.toUpperCase()
+}
+
+function getSourceDiagnosticSummary(diagnostics?: Array<Record<string, unknown>>) {
+  const first = diagnostics?.[0]
+  if (!first) return null
+
+  const detail = typeof first.detail === 'string' ? first.detail : null
+  if (detail) return detail
+
+  if (first.unsupportedForType && typeof first.unsupportedForType === 'string') {
+    return `Fonte ignorada para tipo ${first.unsupportedForType.toLowerCase()}.`
+  }
+
+  if (typeof first.searchUrl === 'string' && typeof first.found === 'number') {
+    return first.found > 0 ? `Descoberta via ${first.searchUrl}.` : `Busca executada sem links validos em ${first.searchUrl}.`
+  }
+
+  return null
+}
+
+function summarizeSourceRun(sourceRun: RadarSourceRun) {
+  const diagnostic = getSourceDiagnosticSummary(sourceRun.diagnostics)
+
+  if (diagnostic) {
+    return `${formatSourceLabel(sourceRun.source)} | ${diagnostic}`
+  }
+
+  if (sourceRun.imported > 0 || sourceRun.updated > 0) {
+    return `${formatSourceLabel(sourceRun.source)} | ${sourceRun.imported} novos | ${sourceRun.updated} atualizados`
+  }
+
+  if (sourceRun.found > 0 && sourceRun.failed === 0) {
+    return `${formatSourceLabel(sourceRun.source)} | ${sourceRun.found} links encontrados aguardando processamento`
+  }
+
+  if (sourceRun.failed > 0) {
+    return `${formatSourceLabel(sourceRun.source)} | ${sourceRun.failed} falha(s) no processamento`
+  }
+
+  return `${formatSourceLabel(sourceRun.source)} | sem atividade relevante nesta rodada`
 }
 
 export default function RadarPage() {
@@ -46,23 +192,55 @@ export default function RadarPage() {
   const [runningScan, setRunningScan] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [scanHistory, setScanHistory] = useState<Array<{ id: string; className: string; text: string }>>([])
+  const [scanRuns, setScanRuns] = useState<RadarRun[]>([])
+  const [sourceHealth, setSourceHealth] = useState<RadarSourceHealth[]>([])
+  const [snapshots, setSnapshots] = useState<RadarSnapshot[]>([])
+  const [runTotals, setRunTotals] = useState({
+    totalRuns: 0,
+    completed: 0,
+    partial: 0,
+    failed: 0,
+    avgFound: 0,
+    avgNew: 0,
+    avgUpdated: 0,
+  })
 
   async function fetchRadarData() {
     setLoading(true)
 
     try {
-      const [configResponse, listingsResponse] = await Promise.all([
+      const [configResponse, listingsResponse, runsResponse, snapshotsResponse] = await Promise.all([
         fetch('/api/alerts'),
         fetch('/api/listings?status=ANALYZED'),
+        fetch('/api/radar/runs?limit=6'),
+        fetch('/api/radar/listings?limit=6'),
       ])
 
       const configData = await configResponse.json()
       const listingsData = await listingsResponse.json()
+      const runsData = await runsResponse.json()
+      const snapshotsData = await snapshotsResponse.json()
 
-      setConfig(normalizeRadarConfig(configData.config))
+      const normalizedConfig = normalizeRadarConfig(configData.config)
+      setConfig(normalizedConfig)
       setListings(listingsData.listings || [])
+      setScanRuns(runsData.runs || [])
+      setSourceHealth(runsData.health?.sourceHealth || [])
+      setRunTotals(
+        runsData.health?.totals || {
+          totalRuns: 0,
+          completed: 0,
+          partial: 0,
+          failed: 0,
+          avgFound: 0,
+          avgNew: 0,
+          avgUpdated: 0,
+        }
+      )
+      setSnapshots(snapshotsData.snapshots || [])
+
       setScanHistory((listingsData.listings || []).slice(0, 8).map((listing: Listing) => {
-        const passed = matchesRadar(listing, normalizeRadarConfig(configData.config))
+        const passed = matchesRadar(listing, normalizedConfig)
 
         if (passed) {
           return {
@@ -91,11 +269,20 @@ export default function RadarPage() {
   }, [])
 
   const radarListings = useMemo(() => listings.filter((listing) => matchesRadar(listing, config)), [config, listings])
-  const latestScanAt = useMemo(() => listings[0]?.createdAt, [listings])
-
+  const latestScanAt = useMemo(() => config.lastScanAt || scanRuns[0]?.startedAt || listings[0]?.createdAt || null, [config.lastScanAt, scanRuns, listings])
+  const nextScanAt = useMemo(() => config.nextScanAt || null, [config.nextScanAt])
+  const latestRun = useMemo(() => scanRuns[0] || null, [scanRuns])
   const scanLog = useMemo(() => scanHistory, [scanHistory])
+  const ignoredSourcesForType = useMemo(() => {
+    if (config.tipo !== 'MOTO') return []
+    return config.fontes.filter((source) => CAR_ONLY_SOURCES.has(source))
+  }, [config.fontes, config.tipo])
+  const partialAutomationSources = useMemo(
+    () => config.fontes.filter((source) => PARTIAL_AUTOMATION_SOURCES.has(source)),
+    [config.fontes]
+  )
 
-  function updateConfigField(field: keyof typeof DEFAULT_RADAR_CONFIG, value: string | number | boolean | string[]) {
+  function updateConfigField(field: keyof typeof DEFAULT_RADAR_CONFIG, value: string | number | boolean | string[] | null) {
     setConfig((current) => ({
       ...current,
       [field]: value,
@@ -139,6 +326,7 @@ export default function RadarPage() {
 
       setConfig(normalizeRadarConfig(data.config || nextConfig))
       setFeedback('Configuracao do radar salva.')
+      await fetchRadarData()
     } catch (error) {
       console.error(error)
       setFeedback(error instanceof Error ? error.message : 'Falha ao salvar configuracao.')
@@ -170,16 +358,31 @@ export default function RadarPage() {
 
       await fetchRadarData()
       const modeLabel =
-        data.summary?.mode === 'search' ? 'busca automática' : data.summary?.mode === 'mixed' ? 'busca + URLs' : 'URLs manuais'
+        data.summary?.mode === 'search' ? 'busca automatica' : data.summary?.mode === 'mixed' ? 'busca + URLs' : 'URLs manuais'
+      const sourceRunHistory = (data.sourceRuns || []).map((sourceRun: RadarSourceRun) => ({
+        id: `${data.scanRunId}-${sourceRun.source}`,
+        className:
+          sourceRun.status === 'FAILED'
+            ? 'scan-log__line scan-log__line--skip'
+            : sourceRun.status === 'PARTIAL'
+              ? 'scan-log__line scan-log__line--skip'
+              : 'scan-log__line scan-log__line--ok',
+        text: summarizeSourceRun(sourceRun),
+      }))
+      const itemHistory = (data.items || []).slice(0, 8).map((item: { url: string; title?: string; status: string; detail: string }) => ({
+        id: `${item.url}-${item.status}`,
+        className: item.status === 'skipped' ? 'scan-log__line scan-log__line--skip' : 'scan-log__line scan-log__line--ok',
+        text: `${item.title || item.url} | ${item.detail}`,
+      }))
+
       setScanHistory(
-        (data.items || []).slice(0, 8).map((item: { url: string; title?: string; status: string; detail: string }) => ({
-          id: `${item.url}-${item.status}`,
-          className: item.status === 'skipped' ? 'scan-log__line scan-log__line--skip' : 'scan-log__line scan-log__line--ok',
-          text: `${item.title || item.url} | ${item.detail}`,
-        }))
+        [...sourceRunHistory, ...itemHistory].slice(0, 12)
       )
+      const sourceSummary = (data.sourceRuns || [])
+        .map((sourceRun: RadarSourceRun) => `${formatSourceLabel(sourceRun.source)} ${sourceRun.imported}/${sourceRun.found}`)
+        .join(' | ')
       setFeedback(
-        `Scan real concluido via ${modeLabel}: ${data.summary.analyzed} analisados, ${data.summary.created} novos, ${data.summary.updated} atualizados e ${data.summary.alerted} alertas enviados.`
+        `Scan ${data.scanRunId} concluido via ${modeLabel}: ${data.summary.analyzed} analisados, ${data.summary.created} novos, ${data.summary.updated} atualizados e ${data.summary.alerted} alertas enviados. ${sourceSummary}`
       )
     } catch (error) {
       console.error(error)
@@ -197,7 +400,7 @@ export default function RadarPage() {
         <div className="page-header">
           <div>
             <h1 className="page-title">Radar de busca</h1>
-            <p className="page-subtitle">Defina seus criterios - o sistema filtra e alerta automaticamente</p>
+            <p className="page-subtitle">Defina criterios, acompanhe a saude do scanner e valide as fontes em producao.</p>
           </div>
 
           <button className="btn" onClick={toggleRadar}>
@@ -208,16 +411,63 @@ export default function RadarPage() {
         <div className={`radar-status ${config.ativo ? 'on' : 'off'}`}>
           <div className={`rdot ${config.ativo ? 'on' : 'off'}`} />
           <div>
-            <strong>{config.ativo ? 'Radar ativo' : 'Radar pausado'}</strong> - {config.modelos.length} modelos
-            monitorados - {config.fontes.length} fontes - ultimo scan {formatRelativeTime(latestScanAt)} -{' '}
-            <strong>{radarListings.length} oportunidades</strong> ativas
-            {config.ativo ? (
-              <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.75 }}>
-                (scan a cada {config.frequenciaMin >= 60 ? `${config.frequenciaMin / 60}h` : `${config.frequenciaMin}min`})
-              </span>
-            ) : null}
+            <strong>{config.ativo ? 'Radar ativo' : 'Radar pausado'}</strong> - {config.modelos.length} modelos monitorados - {config.fontes.length}{' '}
+            fontes - ultimo scan {formatRelativeTime(latestScanAt)} - <strong>{radarListings.length} oportunidades</strong> ativas
+            <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.75 }}>
+              {config.autoScanEnabled ? `proximo scan ${formatDateTime(nextScanAt)}` : 'auto scan desativado'}
+            </span>
           </div>
         </div>
+
+        <section className="card">
+          <div className="card-title">Saude do scanner</div>
+          <div className="radar-config-grid">
+            <div className="radar-config-item">
+              <label>Ultimo run</label>
+              <div style={{ fontWeight: 700 }}>{latestRun ? formatRunStatus(latestRun.status) : 'Sem execucao'}</div>
+              <div className="section-title__hint">{latestRun ? formatDateTime(latestRun.startedAt) : 'Nenhum run ainda'}</div>
+            </div>
+
+            <div className="radar-config-item">
+              <label>Runs recentes</label>
+              <div style={{ fontWeight: 700 }}>{runTotals.totalRuns}</div>
+              <div className="section-title__hint">
+                {runTotals.completed} concluidos, {runTotals.partial} parciais, {runTotals.failed} falhos
+              </div>
+            </div>
+
+            <div className="radar-config-item">
+              <label>Media encontrada</label>
+              <div style={{ fontWeight: 700 }}>{runTotals.avgFound}</div>
+              <div className="section-title__hint">media de itens descobertos por run</div>
+            </div>
+
+            <div className="radar-config-item">
+              <label>Media importada</label>
+              <div style={{ fontWeight: 700 }}>{runTotals.avgNew}</div>
+              <div className="section-title__hint">novos anuncios por run</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 10, marginTop: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            {sourceHealth.length === 0 && !loading ? <div className="panel-muted">Sem dados por fonte ainda.</div> : null}
+            {sourceHealth.map((source) => (
+              <div key={source.source} className="panel-muted" style={{ marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <strong>{formatSourceLabel(source.source)}</strong>
+                  <span style={{ color: source.successRate >= 80 ? '#1f8f4e' : source.successRate >= 50 ? '#b7791f' : '#c53030' }}>
+                    {source.successRate}%
+                  </span>
+                </div>
+                <div className="section-title__hint" style={{ marginTop: 6 }}>
+                  {source.completed} ok, {source.partial} parcial, {source.failed} falha
+                </div>
+                <div className="section-title__hint">media {source.avgFound} encontrados</div>
+                <div className="section-title__hint">ultima execucao {formatRelativeTime(source.lastFinishedAt)}</div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="card">
           <div className="card-title">Fontes monitoradas</div>
@@ -235,6 +485,16 @@ export default function RadarPage() {
             ))}
           </div>
           <div className="section-title__hint">Selecione quais plataformas o radar deve monitorar.</div>
+          {ignoredSourcesForType.length > 0 ? (
+            <div className="section-title__hint" style={{ marginTop: 8 }}>
+              No modo moto, {ignoredSourcesForType.map(formatSourceLabel).join(', ')} ficam apenas como apoio parcial e podem ser ignoradas no scan automatico.
+            </div>
+          ) : null}
+          {partialAutomationSources.length > 0 ? (
+            <div className="section-title__hint" style={{ marginTop: 8 }}>
+              Fontes com automacao parcial nesta fase: {partialAutomationSources.map(formatSourceLabel).join(', ')}.
+            </div>
+          ) : null}
         </section>
 
         <section className="card">
@@ -278,20 +538,12 @@ export default function RadarPage() {
 
             <div className="radar-config-item">
               <label>Preco maximo (R$)</label>
-              <input
-                type="number"
-                value={config.precoMax}
-                onChange={(event) => updateConfigField('precoMax', Number(event.target.value))}
-              />
+              <input type="number" value={config.precoMax} onChange={(event) => updateConfigField('precoMax', Number(event.target.value))} />
             </div>
 
             <div className="radar-config-item">
               <label>Km maxima</label>
-              <input
-                type="number"
-                value={config.kmMax}
-                onChange={(event) => updateConfigField('kmMax', Number(event.target.value))}
-              />
+              <input type="number" value={config.kmMax} onChange={(event) => updateConfigField('kmMax', Number(event.target.value))} />
             </div>
 
             <div className="radar-config-item">
@@ -323,11 +575,7 @@ export default function RadarPage() {
 
             <div className="radar-config-item">
               <label>Ano minimo</label>
-              <input
-                type="number"
-                value={config.anoMin}
-                onChange={(event) => updateConfigField('anoMin', Number(event.target.value))}
-              />
+              <input type="number" value={config.anoMin} onChange={(event) => updateConfigField('anoMin', Number(event.target.value))} />
             </div>
 
             <div className="radar-config-item">
@@ -341,14 +589,23 @@ export default function RadarPage() {
 
             <div className="radar-config-item">
               <label>Frequencia do scan</label>
-              <select
-                value={config.frequenciaMin}
-                onChange={(event) => updateConfigField('frequenciaMin', Number(event.target.value))}
-              >
+              <select value={config.frequenciaMin} onChange={(event) => updateConfigField('frequenciaMin', Number(event.target.value))}>
                 <option value={30}>A cada 30 min</option>
                 <option value={60}>A cada 1 hora</option>
                 <option value={120}>A cada 2 horas</option>
+                <option value={180}>A cada 3 horas</option>
                 <option value={240}>A cada 4 horas</option>
+              </select>
+            </div>
+
+            <div className="radar-config-item">
+              <label>Auto scan</label>
+              <select
+                value={config.autoScanEnabled ? 'on' : 'off'}
+                onChange={(event) => updateConfigField('autoScanEnabled', event.target.value === 'on')}
+              >
+                <option value="on">Ativado</option>
+                <option value="off">Desativado</option>
               </select>
             </div>
           </div>
@@ -361,6 +618,70 @@ export default function RadarPage() {
             <button type="button" className="btn btn-primary" onClick={() => saveConfig()} disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar configuracao'}
             </button>
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-title">Runs recentes</div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {scanRuns.length === 0 && !loading ? <div className="panel-muted">Nenhum run registrado ainda.</div> : null}
+            {scanRuns.map((run) => (
+              <div key={run.id} className="panel-muted" style={{ marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <strong>{run.id}</strong>
+                    <div className="section-title__hint">
+                      {run.mode || 'manual'} | inicio {formatDateTime(run.startedAt)} | fim {formatDateTime(run.finishedAt)}
+                    </div>
+                  </div>
+                  <span style={{ color: getRunTone(run.status), fontWeight: 700 }}>{formatRunStatus(run.status)}</span>
+                </div>
+
+                <div className="section-title__hint" style={{ marginTop: 8 }}>
+                  encontrados {run.totalFound} | novos {run.totalNew} | atualizados {run.totalUpdated} | falhas {run.totalFailed}
+                </div>
+
+                <div style={{ display: 'grid', gap: 8, marginTop: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                  {run.sourceRuns.map((sourceRun) => (
+                    <div key={sourceRun.id} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <strong>{formatSourceLabel(sourceRun.source)}</strong>
+                        <span style={{ color: getRunTone(sourceRun.status), fontWeight: 700 }}>{formatRunStatus(sourceRun.status)}</span>
+                      </div>
+                      <div className="section-title__hint" style={{ marginTop: 6 }}>
+                        found {sourceRun.found} | novos {sourceRun.imported}
+                      </div>
+                      <div className="section-title__hint">atualizados {sourceRun.updated} | falhas {sourceRun.failed}</div>
+                      {getSourceDiagnosticSummary(sourceRun.diagnostics) ? (
+                        <div className="section-title__hint">{getSourceDiagnosticSummary(sourceRun.diagnostics)}</div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-title">Snapshots recentes</div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {snapshots.length === 0 && !loading ? <div className="panel-muted">Nenhum snapshot registrado ainda.</div> : null}
+            {snapshots.map((snapshot) => (
+              <div key={snapshot.id} className="panel-muted" style={{ marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <strong>{snapshot.title || snapshot.listing.title}</strong>
+                  <span>{formatRelativeTime(snapshot.capturedAt)}</span>
+                </div>
+                <div className="section-title__hint" style={{ marginTop: 6 }}>
+                  {formatSourceLabel(snapshot.listing.source)} | score {snapshot.opportunityScore ?? 0} | risco {snapshot.riskScore ?? 0} | status{' '}
+                  {snapshot.status || snapshot.listing.status}
+                </div>
+                <div className="section-title__hint">
+                  {snapshot.city || 'Cidade n/i'} {snapshot.state ? `- ${snapshot.state}` : ''} | R$ {(snapshot.price || 0).toLocaleString('pt-BR')}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 

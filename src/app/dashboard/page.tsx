@@ -4,11 +4,19 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Sidebar from '@/components/ui/Sidebar'
 import ListingCard from '@/components/listings/ListingCard'
-import { safeNumber } from '@/lib/radar'
+import { matchesRadar, normalizeRadarConfig, safeNumber } from '@/lib/radar'
 import { Listing } from '@/types'
 
 type RadarConfig = {
   ativo: boolean
+  modelos?: string[]
+  fontes?: string[]
+  tipo?: string
+  precoMax?: number
+  kmMax?: number
+  distanciaMax?: number
+  anoMin?: number
+  margemMin?: number
   scoreAlerta?: number
   riscoMax?: 'LOW' | 'MEDIUM' | 'HIGH' | string
 }
@@ -21,7 +29,7 @@ function getGreeting() {
   return 'Boa noite'
 }
 
-function formatRelativeTime(value?: string) {
+function formatRelativeTime(value?: string | null) {
   if (!value) return 'nenhum scan concluido ainda'
 
   const timestamp = new Date(value).getTime()
@@ -112,7 +120,10 @@ export default function DashboardPage() {
   }
 
   const metrics = useMemo(() => {
-    const positiveListings = listings.filter((listing) => safeNumber(listing.estimatedMargin) > 0)
+    const normalizedConfig = normalizeRadarConfig(radarConfig)
+    const positiveListings = listings.filter(
+      (listing) => safeNumber(listing.estimatedMargin) > 0 && matchesRadar(listing, normalizedConfig)
+    )
     const avgMargin =
       positiveListings.length > 0
         ? positiveListings.reduce((acc, listing) => acc + safeNumber(listing.estimatedMargin), 0) / positiveListings.length
