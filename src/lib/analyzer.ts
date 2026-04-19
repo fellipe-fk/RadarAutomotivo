@@ -28,45 +28,40 @@ type FipeReference = {
   matchedModel?: string
 }
 
-const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
-const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini'
+type ProviderName = 'OpenAI' | 'Groq'
 
-const ANALYSIS_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    titulo: { type: 'string' },
-    score_oportunidade: { type: 'number' },
-    score_risco: { type: 'number' },
-    nivel_risco: { type: 'string', enum: ['Baixo', 'Medio', 'Alto'] },
-    fipe_estimada: { type: ['number', 'null'] },
-    media_mercado: { type: ['number', 'null'] },
-    margem_estimada: { type: 'string' },
-    resumo: { type: 'string' },
-    sinais_positivos: {
-      type: 'array',
-      items: { type: 'string' },
-    },
-    sinais_alerta: {
-      type: 'array',
-      items: { type: 'string' },
-    },
-    modo_analise: { type: 'string', enum: ['IA'] },
-  },
-  required: [
-    'titulo',
-    'score_oportunidade',
-    'score_risco',
-    'nivel_risco',
-    'fipe_estimada',
-    'media_mercado',
-    'margem_estimada',
-    'resumo',
-    'sinais_positivos',
-    'sinais_alerta',
-    'modo_analise',
-  ],
-} as const
+type AIProviderClient = {
+  provider: ProviderName
+  apiKey: string
+  baseURL: string
+}
+
+type ChatCompletionMessage = {
+  role: 'system' | 'user'
+  content: string
+}
+
+type ChatModelResult = {
+  summary: string
+  score: number
+}
+
+type ChatCompletionResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }>
+    }
+  }>
+  error?: {
+    message?: string
+    type?: string
+    param?: string
+    code?: string
+  }
+}
+
+const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini'
+const GROQ_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.1-8b-instant'
 
 const RISK_TERMS = [
   'leilao',
@@ -248,32 +243,54 @@ function buildHeuristicSummary(params: {
   return `${modeView} ${params.title}: ${priceView} ${marginView} Risco ${params.riskLevel.toLowerCase()} nesta leitura inicial.`
 }
 
-function parseOpenAiOutputText(data: unknown) {
-  if (data && typeof data === 'object' && 'output_text' in data && typeof (data as { output_text?: unknown }).output_text === 'string') {
-    return (data as { output_text: string }).output_text
+function createOpenAIClient(): AIProviderClient | null {
+  const apiKey = getSystemOpenAiApiKey()?.trim()
+  if (!apiKey) return null
+
+  return {
+    provider: 'OpenAI',
+    apiKey,
+    baseURL: 'https://api.openai.com/v1',
   }
-
-  if (!data || typeof data !== 'object' || !('output' in data) || !Array.isArray((data as { output?: unknown[] }).output)) {
-    return ''
-  }
-
-  const output = (data as { output: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }> }).output
-
-  return output
-    .flatMap((item) => item.content || [])
-    .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
-    .map((item) => item.text as string)
-    .join('')
 }
 
-async function analyzeWithOpenAi(input: AnalyzeInput): Promise<AnalysisResult> {
-  const apiKey = getSystemOpenAiApiKey()
+function createGroqClient(): AIProviderClient | null {
+  const apiKey = process.env.GROQ_API_KEY?.trim()
+  if (!apiKey) return null
 
-  if (!apiKey) {
-    throw new Error('A chave da OpenAI do sistema nao foi configurada no servidor.')
+  return {
+    provider: 'Groq',
+    apiKey,
+    baseURL: 'https://api.groq.com/openai/v1',
+  }
+}
+
+function extractProviderErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
   }
 
-  const prompt = `Voce e um especialista em avaliacao de anuncios de veiculos usados para revenda no Brasil.
+  if (typeof error === 'string') {
+    return error
+  }
+
+  try {
+    return JSON.stringify(error, null, 2)
+  } catch {
+    return 'erro desconhecido do provedor'
+  }
+}
+
+function buildAnalysisPrompt(input: AnalyzeInput) {
+  return `Voce e um especialista em avaliacao de anuncios de veiculos usados para revenda no Brasil.
+
+Analise o anuncio abaixo e retorne APENAS um JSON valido no formato:
+{"summary":"texto","score":0}
+
+Regras:
+- "summary" deve ter no maximo 3 frases, em portugues, focando revenda
+- "score" deve ser um numero inteiro de 0 a 100
+- considere preco, km, ano, liquidez, margem e risco basico
 
 Dados do anuncio:
 - Tipo: ${input.type === 'MOTO' ? 'Moto' : 'Carro'}
@@ -286,104 +303,196 @@ ${input.mileage ? `- Quilometragem: ${input.mileage.toLocaleString('pt-BR')} km`
 ${input.year ? `- Ano: ${input.year}` : ''}
 ${input.city ? `- Cidade: ${input.city}` : ''}
 ${input.sourceUrl ? `- Link: ${input.sourceUrl}` : ''}
-${input.sourceContext ? `- Contexto extraido da pagina: ${input.sourceContext}` : ''}
+${input.sourceContext ? `- Contexto extraido da pagina: ${input.sourceContext}` : ''}`.trim()
+}
 
-Analise este anuncio considerando:
-1. Relacao preco vs tabela FIPE estimada para o modelo
-2. Km coerente com o ano do veiculo
-3. Sinais de urgencia de venda na descricao
-4. Sinais de risco ou possivel golpe
-5. Margem de revenda estimada apos custos basicos
-6. Liquidez do modelo no mercado brasileiro
+function extractChatTextContent(content?: string | Array<{ type?: string; text?: string }>) {
+  if (typeof content === 'string') {
+    return content
+  }
 
-Retorne o JSON exatamente no schema solicitado.`
+  if (!Array.isArray(content)) {
+    return ''
+  }
 
-  const response = await fetch(OPENAI_RESPONSES_URL, {
+  return content
+    .map((item) => (typeof item.text === 'string' ? item.text : ''))
+    .join('')
+    .trim()
+}
+
+function extractJsonBlock(content: string) {
+  const trimmed = content.trim()
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed
+  }
+
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+
+  if (start >= 0 && end > start) {
+    return trimmed.slice(start, end + 1)
+  }
+
+  return trimmed
+}
+
+function parseChatModelResult(rawContent: string): ChatModelResult {
+  const jsonBlock = extractJsonBlock(rawContent)
+  const parsed = JSON.parse(jsonBlock) as { summary?: unknown; score?: unknown }
+
+  if (typeof parsed.summary !== 'string') {
+    throw new Error('O provider de IA nao retornou "summary" em formato valido.')
+  }
+
+  const rawScore = typeof parsed.score === 'number' ? parsed.score : Number(parsed.score)
+  if (!Number.isFinite(rawScore)) {
+    throw new Error('O provider de IA nao retornou "score" numerico.')
+  }
+
+  return {
+    summary: parsed.summary.trim(),
+    score: clamp(Math.round(rawScore), 0, 100),
+  }
+}
+
+async function callChatModel(client: AIProviderClient, model: string, prompt: string): Promise<ChatModelResult> {
+  const response = await fetch(`${client.baseURL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${client.apiKey}`,
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
-      input: prompt,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'vehicle_analysis',
-          strict: true,
-          schema: ANALYSIS_SCHEMA,
-        },
-      },
+      model,
+      temperature: 0.2,
+      messages: [
+        {
+          role: 'system',
+          content: 'Responda sempre com JSON valido e sem markdown.',
+        } satisfies ChatCompletionMessage,
+        {
+          role: 'user',
+          content: prompt,
+        } satisfies ChatCompletionMessage,
+      ],
     }),
+    signal: AbortSignal.timeout(30000),
   })
 
+  const responseText = await response.text()
+
   if (!response.ok) {
-    const errorBody = await response.text()
-    throw new Error(errorBody || `Falha na OpenAI (${response.status}).`)
+    throw new Error(responseText || `Falha no provider ${client.provider} (${response.status}).`)
   }
 
-  const data = (await response.json()) as unknown
-  const outputText = parseOpenAiOutputText(data)
-
-  if (!outputText) {
-    throw new Error('A OpenAI nao retornou texto estruturado para esta analise.')
+  const data = JSON.parse(responseText) as ChatCompletionResponse
+  if (data.error?.message) {
+    throw new Error(JSON.stringify(data.error, null, 2))
   }
 
-  const parsed = JSON.parse(outputText) as AnalysisResult
+  const rawContent = extractChatTextContent(data.choices?.[0]?.message?.content)
+
+  if (!rawContent) {
+    throw new Error(`O provider ${client.provider} nao retornou conteudo utilizavel.`)
+  }
+
+  return parseChatModelResult(rawContent)
+}
+
+function buildProviderBackedAnalysis(base: AnalysisResult, aiResult: ChatModelResult, provider: ProviderName): AnalysisResult {
   return {
-    ...parsed,
+    ...base,
+    score_oportunidade: aiResult.score,
+    resumo: aiResult.summary,
     modo_analise: 'IA',
+    observacao: `Analise automatica gerada via ${provider}.`,
   }
+}
+
+async function analyzeWithProvider(client: AIProviderClient, model: string, input: AnalyzeInput): Promise<AnalysisResult> {
+  const prompt = buildAnalysisPrompt(input)
+  const aiResult = await callChatModel(client, model, prompt)
+  const baseAnalysis = await analyzeAdLocally(input)
+
+  return buildProviderBackedAnalysis(baseAnalysis, aiResult, client.provider)
+}
+
+export async function analyzeWithFallback(input: AnalyzeInput): Promise<AnalysisResult> {
+  const providerFailures: string[] = []
+  const openAIClient = createOpenAIClient()
+  if (openAIClient) {
+    try {
+      console.log('[AI] usando OpenAI')
+      return await analyzeWithProvider(openAIClient, OPENAI_MODEL, input)
+    } catch (error) {
+      const detail = extractProviderErrorMessage(error)
+      const reason = getAnalysisFailureMessage(error)
+      providerFailures.push(`OpenAI: ${reason}`)
+      console.warn(`[AI] OpenAI falhou: ${reason} | detalhe: ${detail}`)
+    }
+  } else {
+    providerFailures.push('OpenAI: chave nao configurada')
+    console.warn('[AI] OpenAI falhou: chave nao configurada')
+  }
+
+  const groqClient = createGroqClient()
+  if (groqClient) {
+    try {
+      console.log('[AI] usando Groq')
+      return await analyzeWithProvider(groqClient, GROQ_MODEL, input)
+    } catch (error) {
+      const detail = extractProviderErrorMessage(error)
+      const reason = getAnalysisFailureMessage(error)
+      providerFailures.push(`Groq: ${reason}`)
+      console.warn(`[AI] Groq falhou: ${reason} | detalhe: ${detail}`)
+    }
+  } else {
+    providerFailures.push('Groq: chave nao configurada')
+    console.warn('[AI] Groq falhou: chave nao configurada')
+  }
+
+  console.log('[AI] usando analise local')
+  return analyzeAdLocally(input, providerFailures.join(' | '))
 }
 
 export function getAnalysisFailureMessage(error: unknown) {
   const message = error instanceof Error ? error.message : 'Falha na analise.'
   const normalized = normalizeText(message)
 
-  if (normalized.includes('fetch failed') || normalized.includes('network') || normalized.includes('timeout')) {
-    return 'falha de rede ao acessar OpenAI'
+  if (normalized.includes('credit balance is too low') || normalized.includes('purchase credits') || normalized.includes('insufficient_quota')) {
+    return 'saldo insuficiente no provedor de IA'
   }
 
   if (normalized.includes('invalid api key') || normalized.includes('incorrect api key') || normalized.includes('authentication')) {
-    return 'chave invalida da OpenAI'
+    return 'chave invalida do provedor de IA'
   }
 
   if (normalized.includes('model_not_found') || normalized.includes('does not exist')) {
-    return 'modelo da OpenAI indisponivel ou invalido'
+    return 'modelo indisponivel ou invalido'
+  }
+
+  if (normalized.includes('timeout') || normalized.includes('network') || normalized.includes('fetch failed')) {
+    return 'falha de rede ao acessar o provedor de IA'
   }
 
   if (normalized.includes('unsupported parameter')) {
     return 'payload incompatível com o modelo configurado'
   }
 
-  if (normalized.includes('credit balance is too low') || normalized.includes('purchase credits') || normalized.includes('insufficient_quota')) {
-    return 'saldo insuficiente no provedor de IA'
-  }
-
-  if (normalized.includes('openai')) {
-    return 'falha na OpenAI'
-  }
-
-  if (normalized.includes('chave da openai') || normalized.includes('chave da ia')) {
-    return 'chave do servidor nao configurada'
-  }
-
-  if (normalized.includes('overloaded') || normalized.includes('rate limit')) {
+  if (normalized.includes('rate limit') || normalized.includes('overloaded')) {
     return 'limite temporario do provedor'
+  }
+
+  if (normalized.includes('saldo insuficiente')) {
+    return 'saldo insuficiente no provedor de IA'
   }
 
   return 'indisponibilidade temporaria da IA principal'
 }
 
 export async function analyzeAd(input: AnalyzeInput): Promise<AnalysisResult> {
-  const openAiKey = getSystemOpenAiApiKey()
-
-  if (openAiKey) {
-    return analyzeWithOpenAi(input)
-  }
-
-  throw new Error('A chave da OpenAI do sistema nao foi configurada no servidor.')
+  return analyzeWithFallback(input)
 }
 
 export async function analyzeAdLocally(input: AnalyzeInput, fallbackReason?: string): Promise<AnalysisResult> {
@@ -464,7 +573,7 @@ export async function analyzeAdLocally(input: AnalyzeInput, fallbackReason?: str
 
   const nivelRisco: AnalysisResult['nivel_risco'] = risk >= 65 ? 'Alto' : risk >= 35 ? 'Medio' : 'Baixo'
   const observacao = fallbackReason
-    ? `Analise local automatica usada porque a IA principal ficou indisponivel: ${fallbackReason}.`
+    ? `Analise local automatica usada porque os provedores de IA falharam: ${fallbackReason}.`
     : 'Analise local automatica usada pelo sistema.'
 
   return {
